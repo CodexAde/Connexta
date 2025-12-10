@@ -100,6 +100,15 @@ export const initializeSocketManager = (io) => {
       });
     });
 
+    socket.on('call:toggle-video', (data) => {
+      const { roomId, roomType, isVideoEnabled } = data;
+      const room = roomType === 'channel' ? `call:channel:${roomId}` : `call:dm:${roomId}`;
+      socket.to(room).emit('call:toggle-video', {
+        userId: socket.user._id,
+        isVideoEnabled
+      });
+    });
+
     socket.on('typing:start', (data) => {
       const { channelId, isDm, dmRoomId } = data;
       const room = isDm ? `dm:${dmRoomId}` : `channel:${channelId}`;

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
+import toast from 'react-hot-toast'
 import { useAuth } from './AuthContext'
 import * as callService from '../services/callService'
 
@@ -61,6 +62,15 @@ export const CallProvider = ({ children }) => {
     const handleUserJoined = async (data) => {
       console.log('User joined:', data)
       if (currentCallRef.current && data.user._id !== user?._id) {
+        toast.success(`${data.user.name} joined the call`, {
+          icon: '👋',
+          style: {
+            borderRadius: '10px',
+            background: '#333',
+            color: '#fff',
+          },
+        })
+
         // Add user to participants if not already there
         setParticipants(prev => {
           if (prev.find(p => p._id === data.user._id)) return prev
@@ -129,6 +139,14 @@ export const CallProvider = ({ children }) => {
       )
     }
 
+    const handleVideoToggled = (data) => {
+      // In a real WebRTC app, track stream events usually handle this, but
+      // having an explicit state helps for UI (e.g. showing avatar when remote disabled video)
+      setParticipants(prev => 
+        prev.map(p => p._id === data.userId ? { ...p, isVideoEnabled: data.isVideoEnabled } : p)
+      )
+    }
+
     const handleCallEnded = (data) => {
       const roomKey = data?.roomId
       if (roomKey) {
@@ -146,6 +164,7 @@ export const CallProvider = ({ children }) => {
     socket.on('call:user-left', handleUserLeft)
     socket.on('call:signal', handleSignal)
     socket.on('call:user-muted', handleUserMuted)
+    socket.on('call:toggle-video', handleVideoToggled)
     socket.on('call:ended', handleCallEnded)
 
     return () => {
@@ -154,9 +173,31 @@ export const CallProvider = ({ children }) => {
       socket.off('call:user-left', handleUserLeft)
       socket.off('call:signal', handleSignal)
       socket.off('call:user-muted', handleUserMuted)
+      socket.off('call:toggle-video', handleVideoToggled)
       socket.off('call:ended', handleCallEnded)
     }
   }, [socket, user?._id])
+
+  // Handle negotiation needed event (crucial for adding tracks mid-call)
+  const handleNegotiationNeeded = async (pc, userId) => {
+    try {
+      // Only the initiator should effectively restart negotiation to avoid glare, 
+      // but simpler is to just let the side adding the track create an offer.
+      // In this app context, if we add a track, we create an offer.
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      
+      const call = currentCallRef.current
+      socket.emit('call:signal', {
+        roomId: call?.channel || call?.dmRoomId,
+        roomType: call?.type,
+        signalData: offer,
+        targetUserId: userId
+      })
+    } catch (error) {
+      console.error('Negotiation error:', error)
+    }
+  }
 
   const createPeerConnection = async (userId, initiator) => {
     console.log('Creating peer connection for:', userId, 'initiator:', initiator)
@@ -173,7 +214,6 @@ export const CallProvider = ({ children }) => {
     const stream = localStreamRef.current
     if (stream) {
       stream.getTracks().forEach(track => {
-        console.log('Adding track:', track.kind)
         pc.addTrack(track, stream)
       })
     }
@@ -186,6 +226,9 @@ export const CallProvider = ({ children }) => {
         prev.map(p => p._id === userId ? { ...p, stream: event.streams[0] } : p)
       )
     }
+
+    // Handle negotiation needed
+    pc.onnegotiationneeded = () => handleNegotiationNeeded(pc, userId)
 
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
@@ -200,15 +243,7 @@ export const CallProvider = ({ children }) => {
       }
     }
 
-    pc.oniceconnectionstatechange = () => {
-      console.log('ICE state:', pc.iceConnectionState)
-    }
-
-    pc.onconnectionstatechange = () => {
-      console.log('Connection state:', pc.connectionState)
-    }
-
-    // If initiator, create and send offer
+    // If initiator, create and send offer (optimization: manually done to ensure initial connect)
     if (initiator) {
       try {
         const offer = await pc.createOffer({
@@ -246,7 +281,7 @@ export const CallProvider = ({ children }) => {
       const data = await callService.createCall({ type, channelId, recipientId })
       setCurrentCall(data.call)
       currentCallRef.current = data.call
-      setParticipants([{ ...user, isMuted: false }])
+      setParticipants([{ ...user, isMuted: false, isVideoEnabled: withVideo }])
       setInCall(true)
 
       if (socket) {
@@ -270,7 +305,7 @@ export const CallProvider = ({ children }) => {
           const data = await callService.createCall({ type, channelId, recipientId })
           setCurrentCall(data.call)
           currentCallRef.current = data.call
-          setParticipants([{ ...user, isMuted: false }])
+          setParticipants([{ ...user, isMuted: false, isVideoEnabled: false }])
           setInCall(true)
 
           if (socket) {
@@ -290,14 +325,19 @@ export const CallProvider = ({ children }) => {
     }
   }
 
-  const joinCall = async (call) => {
+  const joinCall = async (call, withVideo = false) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-        .catch(() => navigator.mediaDevices.getUserMedia({ audio: true, video: false }))
+      // Respect withVideo preference
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: withVideo 
+      })
       
       setLocalStream(stream)
       localStreamRef.current = stream
-      setIsVideoEnabled(stream.getVideoTracks().length > 0)
+      // Check if we actually got video
+      const hasVideo = stream.getVideoTracks().length > 0
+      setIsVideoEnabled(hasVideo)
 
       await callService.joinCall(call._id)
       setCurrentCall(call)
@@ -356,28 +396,66 @@ export const CallProvider = ({ children }) => {
   const toggleVideo = async () => {
     if (localStream) {
       const videoTracks = localStream.getVideoTracks()
+      let newEnabledState = false
+
       if (videoTracks.length > 0) {
-        videoTracks[0].enabled = !videoTracks[0].enabled
-        setIsVideoEnabled(videoTracks[0].enabled)
+        // Check if track is live
+        const track = videoTracks[0]
+        if (track.readyState === 'ended') {
+          // If track ended, we need to get a new one
+          try {
+            const videoStream = await navigator.mediaDevices.getUserMedia({ video: true })
+            const newTrack = videoStream.getVideoTracks()[0]
+            localStream.removeTrack(track)
+            localStream.addTrack(newTrack)
+            newEnabledState = true
+            
+            // Replace track in peer connections
+            Object.values(peerConnections.current).forEach(pc => {
+              const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+              if (sender) {
+                sender.replaceTrack(newTrack)
+              } else {
+                pc.addTrack(newTrack, localStream)
+              }
+            })
+          } catch (error) {
+            console.error('Failed to restart video:', error)
+            return
+          }
+        } else {
+          // Normal toggle
+          track.enabled = !track.enabled
+          newEnabledState = track.enabled
+        }
       } else {
+        // Add new video track (upgrade from audio-only)
         try {
           const videoStream = await navigator.mediaDevices.getUserMedia({ video: true })
           const videoTrack = videoStream.getVideoTracks()[0]
           localStream.addTrack(videoTrack)
-          setIsVideoEnabled(true)
+          newEnabledState = true
           
-          // Add video track to all peer connections
+          // Add video track to all peer connections - this will trigger negotiationneeded
           Object.values(peerConnections.current).forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track?.kind === 'video')
-            if (sender) {
-              sender.replaceTrack(videoTrack)
-            } else {
-              pc.addTrack(videoTrack, localStream)
-            }
+            pc.addTrack(videoTrack, localStream)
           })
         } catch (error) {
           console.error('Failed to enable video:', error)
+          return
         }
+      }
+
+      setIsVideoEnabled(newEnabledState)
+
+      // Signal video state change
+      if (socket && currentCall) {
+        socket.emit('call:toggle-video', {
+          roomId: currentCall.channel || currentCall.dmRoomId,
+          roomType: currentCall.type,
+          isVideoEnabled: newEnabledState,
+          userId: user._id
+        })
       }
     }
   }

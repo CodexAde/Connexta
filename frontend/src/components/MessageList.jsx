@@ -1,6 +1,20 @@
+import { useRef } from 'react'
 import Avatar from './Avatar'
 
-function MessageList({ messages, currentUserId }) {
+function MessageList({ messages, currentUserId, onLoadMore, hasMore, isFetchingMore, bottomRef }) {
+  const scrollRef = useRef(null)
+  
+  const handleScroll = (e) => {
+    if (e.target.scrollTop === 0 && hasMore && onLoadMore && !isFetchingMore) {
+      // Trigger load more
+      onLoadMore().then(() => {
+        // Scroll restoration could happen here if needed, but usually handled by parent 
+        // managing state updates or calculating scroll height diff.
+        // Since React state update is async, we can't easily restore scroll here synchronously.
+      });
+    }
+  }
+
   const formatTime = (dateString) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('en-US', { 
@@ -113,7 +127,17 @@ function MessageList({ messages, currentUserId }) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+    <div 
+      className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6"
+      onScroll={handleScroll}
+      ref={scrollRef}
+    >
+      {isFetchingMore && (
+        <div className="flex justify-center py-2">
+          <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+        </div>
+      )}
+      
       {Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
         <div key={dateKey}>
           {/* Date divider */}
@@ -142,7 +166,7 @@ function MessageList({ messages, currentUserId }) {
                     </div>
                   )}
 
-                  <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} max-w-[75%]`}>
+                  <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} max-w-[85%]`}>
                     {showAvatar && (
                       <div className={`flex items-center gap-2 mb-1.5 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
                         <span className="text-sm font-medium text-white">
@@ -177,6 +201,7 @@ function MessageList({ messages, currentUserId }) {
           </div>
         </div>
       ))}
+      <div ref={bottomRef} />
     </div>
   )
 }

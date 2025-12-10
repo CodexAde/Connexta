@@ -95,8 +95,14 @@ body {
   }
   
   /* Use dvh for mobile viewport */
+  /* Use standard vh with the new meta tag for proper keyboard resizing */
   .h-screen {
-    height: 100dvh !important;
+    height: 100vh !important; 
+  }
+  
+  /* Fallbacks/alternatives if needed */
+  .min-h-screen {
+    min-height: 100vh !important;
   }
   
   .min-h-screen {
@@ -187,14 +193,14 @@ body {
   /* Improved message bubbles */
   .message-bubble {
     @apply px-4 py-3 bg-white/[0.06] rounded-2xl rounded-bl-sm inline-block;
-    max-width: 85%;
+    max-width: 100%;
     word-wrap: break-word;
     line-height: 1.6;
   }
 
   .message-bubble-own {
     @apply px-4 py-3 bg-white text-black rounded-2xl rounded-br-sm inline-block;
-    max-width: 85%;
+    max-width: 100%;
     word-wrap: break-word;
     line-height: 1.6;
   }

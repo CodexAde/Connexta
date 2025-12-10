@@ -16,22 +16,29 @@ function DMsPage() {
   const navigate = useNavigate()
   const { user, socket } = useAuth()
   const { users, getUserById } = useUser()
-  const { dmChannels, getOrCreateDMChannel, setCurrentChannel } = useChannel()
-  const { startCall, inCall } = useCall()
+  const { dmChannels, channels, getOrCreateDMChannel, setCurrentChannel } = useChannel()
+  const { startCall, joinCall, inCall, ongoingCalls } = useCall()
 
   const [selectedUser, setSelectedUser] = useState(null)
   const [dmChannel, setDmChannel] = useState(null)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
-  const [showChat, setShowChat] = useState(false)
+  const [showMobileList, setShowMobileList] = useState(true)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [isFetchingMore, setIsFetchingMore] = useState(false)
   const messagesEndRef = useRef(null)
 
   useEffect(() => {
     if (userId) {
       loadDMUser(userId)
-      setShowChat(true)
+      setShowMobileList(false)
+    } else {
+      setSelectedUser(null)
+      setDmChannel(null)
+      setShowMobileList(true)
     }
-  }, [userId])
+  }, [userId, users])
 
   useEffect(() => {
     if (selectedUser) {
@@ -41,10 +48,13 @@ function DMsPage() {
 
   useEffect(() => {
     if (socket && dmChannel) {
+      socket.emit('call:join', { roomId: dmChannel._id, roomType: 'dm' })
+      // Join the channel room for real-time messages
+      socket.emit('join:channel', dmChannel._id)
+
       const handleNewMessage = (message) => {
-        if (message.dmRoomId === dmChannel.slug) {
+        if (message.channel === dmChannel._id) {
           setMessages(prev => [...prev, message])
-          scrollToBottom()
         }
       }
 
@@ -52,9 +62,18 @@ function DMsPage() {
 
       return () => {
         socket.off('message:new', handleNewMessage)
+        socket.emit('call:leave', { roomId: dmChannel._id, roomType: 'dm' })
+        socket.emit('leave:channel', dmChannel._id)
       }
     }
   }, [socket, dmChannel])
+
+  // Scroll on new messages
+  useEffect(() => {
+    if (messages.length > 0 && !isFetchingMore) {
+        scrollToBottom('smooth')
+    }
+  }, [messages, isFetchingMore])
 
   const loadDMUser = async (id) => {
     let foundUser = users.find(u => u._id === id)
@@ -74,7 +93,7 @@ function DMsPage() {
       const channel = await getOrCreateDMChannel(selectedUser._id)
       setDmChannel(channel)
       setCurrentChannel(channel)
-      await loadMessages()
+      await loadMessages(1, false, channel._id)
     } catch (error) {
       console.error('Failed to load DM channel:', error)
     } finally {
@@ -82,37 +101,68 @@ function DMsPage() {
     }
   }
 
-  const loadMessages = async () => {
+  const loadMessages = async (pageNum = 1, isLoadMore = false, channelIdOverride = null) => {
     if (!selectedUser) return
     
     try {
-      const data = await messageService.getDMMessages(selectedUser._id)
-      setMessages(data.messages)
-      setTimeout(scrollToBottom, 100)
+      if (!isLoadMore) setLoading(true)
+      else setIsFetchingMore(true)
+
+      // Use getDMMessages via message service
+      const data = await messageService.getDMMessages(selectedUser._id, pageNum)
+      
+      const newMessages = data.messages || []
+      
+      if (newMessages.length < 50) {
+        setHasMore(false)
+      } else {
+        setHasMore(true)
+      }
+
+      if (isLoadMore) {
+        setMessages(prev => [...newMessages, ...prev])
+      } else {
+        setMessages(newMessages)
+        setTimeout(() => scrollToBottom('auto'), 50)
+      }
+      
+      setPage(pageNum)
     } catch (error) {
       console.error('Failed to load messages:', error)
+    } finally {
+      setLoading(false)
+      setIsFetchingMore(false)
     }
   }
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const handleScrollTop = () => {
+    if (!isFetchingMore && hasMore) {
+      loadMessages(page + 1, true)
+    }
   }
 
-  const handleUserSelect = (selectedUser) => {
-    setSelectedUser(selectedUser)
-    setShowChat(true)
-    navigate(`/app/dm/${selectedUser._id}`)
+  const scrollToBottom = (behavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior })
+  }
+
+  // ... (rest is fine up to Render) ...
+
+
+
+  const handleUserSelect = (u) => {
+    setSelectedUser(u)
+    setShowMobileList(false)
+    navigate(`/app/dm/${u._id}`)
   }
 
   const handleSendMessage = async (content, attachments) => {
-    if (!selectedUser) return
+    if (!dmChannel?._id) return
 
     try {
       await messageService.createMessage({
+        channelId: dmChannel._id,
         content,
-        attachments,
-        isDm: true,
-        recipientId: selectedUser._id
+        attachments
       })
     } catch (error) {
       console.error('Failed to send message:', error)
@@ -120,10 +170,17 @@ function DMsPage() {
   }
 
   const handleStartCall = async (withVideo = false) => {
-    if (!selectedUser || inCall) return
+    if (!dmChannel?._id || inCall) return
     
     try {
-      const call = await startCall('dm', null, selectedUser._id, withVideo)
+      const ongoingCall = ongoingCalls[dmChannel._id]
+      if (ongoingCall) {
+        await joinCall(ongoingCall)
+        navigate('/call')
+        return
+      }
+      
+      const call = await startCall('dm', dmChannel._id, selectedUser._id, withVideo)
       if (call) {
         navigate('/call')
       }
@@ -131,9 +188,19 @@ function DMsPage() {
       console.error('Failed to start call:', error)
     }
   }
+  
+  const handleJoinOngoingCall = async () => {
+     const ongoingCall = ongoingCalls[dmChannel?._id]
+     if (ongoingCall) {
+       await joinCall(ongoingCall)
+       navigate('/call')
+     }
+  }
+  
+  const activeCall = dmChannel ? ongoingCalls[dmChannel._id] : null
 
   const handleBack = () => {
-    setShowChat(false)
+    setShowMobileList(true)
     setSelectedUser(null)
     navigate('/app/dm')
   }
@@ -142,18 +209,15 @@ function DMsPage() {
     return channel.members?.find(m => m._id !== user?._id)
   }
 
-  // Mobile: show either list or chat
-  const showListOnMobile = !showChat || !selectedUser
-
   return (
-    <div className="h-full flex">
-      {/* DM List - Hidden on mobile when chat is open */}
-      <div className={`w-full md:w-72 border-r border-white/[0.05] flex flex-col shrink-0 ${showListOnMobile ? 'block' : 'hidden md:flex'}`}>
+    <div className="h-full flex overflow-hidden">
+      {/* Sidebar - hidden on mobile when chat is active */}
+      <div className={`${showMobileList ? 'flex' : 'hidden'} md:flex w-full md:w-80 border-r border-white/[0.05] flex-col bg-black`}>
         <div className="p-4 border-b border-white/[0.05]">
-          <h2 className="text-lg font-semibold text-white mb-4">Direct Messages</h2>
-          <UserSearch onUserSelect={handleUserSelect} />
+          <h2 className="text-xl font-bold text-white mb-4">Messages</h2>
+          <UserSearch onUserSelect={(u) => navigate(`/app/dm/${u._id}`)} />
         </div>
-
+        
         <div className="flex-1 overflow-y-auto p-2">
           {dmChannels.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
@@ -194,76 +258,106 @@ function DMsPage() {
       </div>
 
       {/* Chat Area */}
-      <div className={`flex-1 flex flex-col min-w-0 ${showListOnMobile ? 'hidden md:flex' : 'flex'}`}>
-        {selectedUser ? (
-          <>
-            {/* Chat header */}
-            <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-white/[0.05] shrink-0">
-              <div className="flex items-center gap-3">
-                {/* Back button for mobile */}
-                <button
-                  onClick={handleBack}
-                  className="md:hidden p-2 -ml-2 rounded-lg hover:bg-white/[0.05] transition-colors"
-                >
-                  <ArrowLeft className="w-5 h-5 text-gray-400" />
-                </button>
-                <Avatar user={selectedUser} size="md" />
-                <div>
-                  <h2 className="text-base md:text-lg font-semibold text-white">{selectedUser.name}</h2>
-                  <p className="text-xs md:text-sm text-gray-600">{selectedUser.department}</p>
+      {userId ? (
+        <div className={`${!showMobileList ? 'flex' : 'hidden'} md:flex flex-1 flex-col bg-black w-full`}>
+          {selectedUser ? (
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={handleBack}
+                    className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <Avatar user={selectedUser} size="sm" />
+                  <div>
+                    <h3 className="font-semibold text-white">{selectedUser.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 flex items-center gap-1">
+                        <span className={`w-1.5 h-1.5 rounded-full ${selectedUser.isOnline ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                        {selectedUser.isOnline ? 'Online' : 'Offline'}
+                      </span>
+                      {activeCall && (
+                        <span className="flex items-center gap-1 text-green-500 text-xs font-medium px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                          Call Active
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {activeCall ? (
+                    <button
+                      onClick={handleJoinOngoingCall}
+                      disabled={inCall}
+                      className="btn-primary flex items-center gap-2 px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white border-none animate-pulse"
+                      title="Join ongoing call"
+                    >
+                      <Video className="w-4 h-4" />
+                      <span>Join Call</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => handleStartCall(false)}
+                        disabled={inCall}
+                        className="p-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-white transition-colors disabled:opacity-50"
+                      >
+                        <Phone className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleStartCall(true)}
+                        disabled={inCall}
+                        className="p-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-white transition-colors disabled:opacity-50"
+                      >
+                        <Video className="w-5 h-5" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleStartCall(false)}
-                  disabled={inCall}
-                  className="p-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-white transition-colors disabled:opacity-50"
-                  title="Audio call"
-                >
-                  <Phone className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => handleStartCall(true)}
-                  disabled={inCall}
-                  className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
-                  title="Video call"
-                >
-                  <Video className="w-4 h-4" />
-                  <span className="hidden sm:inline">Video</span>
-                </button>
-              </div>
-            </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-hidden flex flex-col">
-              {loading ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                </div>
-              ) : (
-                <MessageList messages={messages} currentUserId={user?._id} />
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <MessageInput 
-              onSendMessage={handleSendMessage} 
-              placeholder={`Message ${selectedUser.name}`} 
-            />
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-white/[0.03] flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="w-10 h-10 text-gray-600" />
+              {/* Messages */}
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {loading ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                  </div>
+                ) : (
+                   <MessageList 
+                    messages={messages} 
+                    currentUserId={user?._id} 
+                    onLoadMore={handleScrollTop}
+                    hasMore={hasMore}
+                    isFetchingMore={isFetchingMore}
+                    bottomRef={messagesEndRef}
+                  />
+                )}
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Select a conversation</h3>
-              <p className="text-gray-500">Choose a person from the list or search for someone new</p>
-            </div>
+
+              <MessageInput 
+                onSendMessage={handleSendMessage}
+                placeholder={`Message ${selectedUser.name}`}
+              />
+            </>
+          ) : (
+             <div className="flex-1 flex items-center justify-center">
+                <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+             </div>
+          )}
+        </div>
+      ) : (
+        <div className="hidden md:flex flex-1 items-center justify-center text-gray-500">
+          <div className="text-center">
+             <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-20" />
+             <p>Select a conversation to start messaging</p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

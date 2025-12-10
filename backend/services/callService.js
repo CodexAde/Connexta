@@ -60,29 +60,40 @@ export const joinCall = async (callId, userId) => {
 };
 
 export const leaveCall = async (callId, userId) => {
-  const call = await Call.findById(callId);
+  // Use atomic update to remove participant regardless of current version
+  const call = await Call.findByIdAndUpdate(
+    callId,
+    { $pull: { participants: userId } },
+    { new: true } 
+  )
+    .populate('participants', 'name email avatarUrl')
+    .populate('startedBy', 'name email avatarUrl');
   
   if (!call) {
     throw new Error('Call not found');
   }
   
-  call.participants = call.participants.filter(
-    p => p.toString() !== userId.toString()
-  );
-  
-  if (call.participants.length === 0) {
-    call.isActive = false;
-    call.endedAt = new Date();
-    call.duration = Math.floor((call.endedAt - call.startedAt) / 1000);
+  // If no participants left, close the call
+  if (call.participants.length === 0 && call.isActive) {
+    const endedAt = new Date();
+    const duration = Math.floor((endedAt - call.startedAt) / 1000);
+    
+    const closedCall = await Call.findByIdAndUpdate(
+      callId,
+      { 
+        isActive: false, 
+        endedAt,
+        duration
+      },
+      { new: true }
+    )
+      .populate('participants', 'name email avatarUrl')
+      .populate('startedBy', 'name email avatarUrl');
+      
+    return closedCall;
   }
   
-  await call.save();
-  
-  const populatedCall = await Call.findById(call._id)
-    .populate('participants', 'name email avatarUrl')
-    .populate('startedBy', 'name email avatarUrl');
-  
-  return populatedCall;
+  return call;
 };
 
 export const endCall = async (callId) => {

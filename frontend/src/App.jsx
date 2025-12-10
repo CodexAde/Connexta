@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import { useAuth } from './context/AuthContext'
 import ScrollToTop from './components/ScrollToTop'
 import LandingPage from './pages/LandingPage'
@@ -91,6 +92,12 @@ function App() {
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      <Toaster position="top-center" toastOptions={{
+        style: {
+          background: '#333',
+          color: '#fff',
+        },
+      }} />
     </>
   )
 }

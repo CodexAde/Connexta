@@ -75,35 +75,40 @@ function DMsPage() {
     }
   }, [messages, isFetchingMore])
 
-  // Mobile keyboard scroll handling - simple approach
+  // Mobile keyboard handling - state based
   const inputRef = useRef(null)
   const inputContainerRef = useRef(null)
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
 
   useEffect(() => {
-    // When viewport resizes (keyboard opens/closes), scroll input into view
-    const handleViewportResize = () => {
-      // Small delay for keyboard animation to complete
-      setTimeout(() => {
-        // Scroll input into view when keyboard opens
-        if (inputRef.current) {
-          inputRef.current.scrollIntoView({ behavior: 'auto', block: 'nearest' })
-        }
-        // Also scroll messages to bottom
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' })
-        }
-      }, 100)
-    }
+    if (!window.visualViewport) return;
 
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportResize)
-    }
+    const viewport = window.visualViewport;
+    const initialHeight = window.innerHeight;
+
+    const handleViewportResize = () => {
+      const keyboardHeight = initialHeight - viewport.height;
+
+      // Keyboard open if height reduced by more than 100px
+      if (keyboardHeight > 100) {
+        setIsKeyboardOpen(true);
+      } else {
+        setIsKeyboardOpen(false);
+      }
+
+      // Scroll to bottom
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
+        }
+      }, 100);
+    };
+
+    viewport.addEventListener('resize', handleViewportResize);
 
     return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleViewportResize)
-      }
-    }
+      viewport.removeEventListener('resize', handleViewportResize);
+    };
   }, [])
 
   const loadDMUser = async (id) => {
@@ -175,13 +180,13 @@ function DMsPage() {
   const scrollToBottom = (behavior = 'smooth') => {
     // Priority: Set container scrollTop directly
     if (messagesEndRef.current?.parentElement) {
-       const container = messagesEndRef.current.parentElement
-       // Use smooth only if explicitly requested and difference is large? 
-       // For keyboard 'auto' is better.
-       container.scrollTo({
-         top: container.scrollHeight,
-         behavior: behavior
-       })
+      const container = messagesEndRef.current.parentElement
+      // Use smooth only if explicitly requested and difference is large? 
+      // For keyboard 'auto' is better.
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: behavior
+      })
     }
     // Backup
     messagesEndRef.current?.scrollIntoView({ behavior })
@@ -278,8 +283,8 @@ function DMsPage() {
                     key={channel._id}
                     onClick={() => handleUserSelect(otherUser)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${selectedUser?._id === otherUser._id
-                        ? 'bg-white/[0.08] text-white'
-                        : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
+                      ? 'bg-white/[0.08] text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
                       }`}
                   >
                     <Avatar user={otherUser} size="sm" />
@@ -377,14 +382,13 @@ function DMsPage() {
                     bottomRef={messagesEndRef}
                   />
                 )}
-              </div>
-
-              <div ref={inputContainerRef} className="shrink-0 bg-black pb-4">
-                <MessageInput 
-                  onSendMessage={handleSendMessage}
-                  placeholder={`Message ${selectedUser.name}`}
-                  inputRef={inputRef}
-                />
+                <div ref={inputContainerRef} className={`shrink-0 bg-black ${isKeyboardOpen ? 'pb-20' : 'pb-4'}`}>
+                  <MessageInput
+                    onSendMessage={handleSendMessage}
+                    placeholder={`Message ${selectedUser.name}`}
+                    inputRef={inputRef}
+                  />
+                </div>
               </div>
             </>
           ) : (

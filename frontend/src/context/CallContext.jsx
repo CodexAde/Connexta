@@ -157,10 +157,15 @@ export const CallProvider = ({ children }) => {
     return pc
   }
 
-  const startCall = async (type, channelId, recipientId) => {
+  const startCall = async (type, channelId, recipientId, withVideo = false) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      // Request media based on options
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: withVideo 
+      })
       setLocalStream(stream)
+      setIsVideoEnabled(withVideo)
 
       const data = await callService.createCall({ type, channelId, recipientId })
       setCurrentCall(data.call)
@@ -177,6 +182,31 @@ export const CallProvider = ({ children }) => {
       return data.call
     } catch (error) {
       console.error('Failed to start call:', error)
+      // Try audio-only if video fails
+      if (withVideo) {
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+          setLocalStream(audioStream)
+          setIsVideoEnabled(false)
+          
+          const data = await callService.createCall({ type, channelId, recipientId })
+          setCurrentCall(data.call)
+          setParticipants([{ ...user, isMuted: false }])
+          setInCall(true)
+
+          if (socket) {
+            socket.emit('call:join', {
+              roomId: channelId || recipientId,
+              roomType: type
+            })
+          }
+
+          return data.call
+        } catch (audioError) {
+          console.error('Failed to start audio call:', audioError)
+          throw audioError
+        }
+      }
       throw error
     }
   }

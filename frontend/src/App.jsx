@@ -7,6 +7,7 @@ import DashboardLayout from './pages/DashboardLayout'
 import ChannelPage from './pages/ChannelPage'
 import DMsPage from './pages/DMsPage'
 import CallRoomPage from './pages/CallRoomPage'
+import VideoCallPage from './pages/VideoCallPage'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -61,6 +62,19 @@ function App() {
           <RegisterPage />
         </PublicRoute>
       } />
+      
+      {/* Video call page - full screen, outside dashboard layout */}
+      <Route path="/call/:callId" element={
+        <ProtectedRoute>
+          <VideoCallPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/call" element={
+        <ProtectedRoute>
+          <VideoCallPage />
+        </ProtectedRoute>
+      } />
+      
       <Route path="/app" element={
         <ProtectedRoute>
           <DashboardLayout />

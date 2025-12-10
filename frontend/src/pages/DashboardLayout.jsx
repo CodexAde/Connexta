@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import Topbar from '../components/Topbar'
-import CallPanel from '../components/CallPanel'
 import IncomingCallModal from '../components/IncomingCallModal'
 import { useCall } from '../context/CallContext'
-import { Menu, X } from 'lucide-react'
+import { Menu } from 'lucide-react'
 
 function DashboardLayout() {
-  const { inCall, incomingCall } = useCall()
+  const { incomingCall } = useCall()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -53,8 +52,7 @@ function DashboardLayout() {
           <Outlet />
         </main>
       </div>
-
-      {inCall && <CallPanel />}
+      {/* Incoming call modal - show inside dashboard */}
       {incomingCall && <IncomingCallModal />}
     </div>
   )

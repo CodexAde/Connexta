@@ -9,7 +9,7 @@ import MessageInput from '../components/MessageInput'
 import UserSearch from '../components/UserSearch'
 import Avatar from '../components/Avatar'
 import * as messageService from '../services/messageService'
-import { Phone, ArrowLeft, MessageSquare } from 'lucide-react'
+import { Phone, ArrowLeft, MessageSquare, Video } from 'lucide-react'
 
 function DMsPage() {
   const { userId } = useParams()
@@ -119,11 +119,14 @@ function DMsPage() {
     }
   }
 
-  const handleStartCall = async () => {
+  const handleStartCall = async (withVideo = false) => {
     if (!selectedUser || inCall) return
     
     try {
-      await startCall('dm', null, selectedUser._id)
+      const call = await startCall('dm', null, selectedUser._id, withVideo)
+      if (call) {
+        navigate('/call')
+      }
     } catch (error) {
       console.error('Failed to start call:', error)
     }
@@ -211,14 +214,25 @@ function DMsPage() {
                 </div>
               </div>
               
-              <button
-                onClick={handleStartCall}
-                disabled={inCall}
-                className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
-              >
-                <Phone className="w-4 h-4" />
-                <span className="hidden sm:inline">Call</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleStartCall(false)}
+                  disabled={inCall}
+                  className="p-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-white transition-colors disabled:opacity-50"
+                  title="Audio call"
+                >
+                  <Phone className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handleStartCall(true)}
+                  disabled={inCall}
+                  className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+                  title="Video call"
+                >
+                  <Video className="w-4 h-4" />
+                  <span className="hidden sm:inline">Video</span>
+                </button>
+              </div>
             </div>
 
             {/* Messages */}

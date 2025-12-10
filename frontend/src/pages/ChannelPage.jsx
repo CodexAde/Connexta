@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useChannel } from '../context/ChannelContext'
 import { useCall } from '../context/CallContext'
 import MessageList from '../components/MessageList'
 import MessageInput from '../components/MessageInput'
 import * as messageService from '../services/messageService'
-import { Hash, Phone, Users } from 'lucide-react'
+import { Hash, Phone, Users, Video } from 'lucide-react'
 
 function ChannelPage() {
   const { channelId } = useParams()
+  const navigate = useNavigate()
   const { user, socket } = useAuth()
   const { channels, setCurrentChannel, getChannelById, getChannelBySlug } = useChannel()
   const { startCall, inCall } = useCall()
@@ -98,11 +99,14 @@ function ChannelPage() {
     }
   }
 
-  const handleStartCall = async () => {
+  const handleStartCall = async (withVideo = false) => {
     if (!channel?._id || inCall) return
     
     try {
-      await startCall('channel', channel._id)
+      const call = await startCall('channel', channel._id, null, withVideo)
+      if (call) {
+        navigate('/call')
+      }
     } catch (error) {
       console.error('Failed to start call:', error)
     }
@@ -136,14 +140,25 @@ function ChannelPage() {
           </div>
         </div>
         
-        <button
-          onClick={handleStartCall}
-          disabled={inCall}
-          className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
-        >
-          <Phone className="w-4 h-4" />
-          <span className="hidden sm:inline">Start Call</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleStartCall(false)}
+            disabled={inCall}
+            className="p-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-white transition-colors disabled:opacity-50"
+            title="Start audio call"
+          >
+            <Phone className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => handleStartCall(true)}
+            disabled={inCall}
+            className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+            title="Start video call"
+          >
+            <Video className="w-4 h-4" />
+            <span className="hidden sm:inline">Video Call</span>
+          </button>
+        </div>
       </div>
 
       {/* Messages */}

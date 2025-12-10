@@ -1,12 +1,15 @@
+import { useEffect, useRef, useState } from 'react'
 import { useCall } from '../context/CallContext'
 import { useAuth } from '../context/AuthContext'
 import Avatar from './Avatar'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Maximize2, Minimize2 } from 'lucide-react'
 
 function CallPanel() {
   const { user } = useAuth()
   const { 
     currentCall, 
     participants, 
+    localStream,
     isMuted, 
     isVideoEnabled,
     toggleMute, 
@@ -14,94 +17,158 @@ function CallPanel() {
     leaveCall 
   } = useCall()
 
+  const [isExpanded, setIsExpanded] = useState(false)
+  const localVideoRef = useRef(null)
+  const remoteVideoRefs = useRef({})
+
+  // Attach local stream to video element
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream
+    }
+  }, [localStream])
+
+  // Attach remote streams to video elements
+  useEffect(() => {
+    participants.forEach(participant => {
+      if (participant.stream && remoteVideoRefs.current[participant._id]) {
+        remoteVideoRefs.current[participant._id].srcObject = participant.stream
+      }
+    })
+  }, [participants])
+
   if (!currentCall) return null
 
+  const otherParticipants = participants.filter(p => p._id !== user?._id)
+
   return (
-    <div className="fixed bottom-6 right-6 glass rounded-2xl shadow-2xl p-4 min-w-80 z-50 animate-slide-in">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-semibold text-white">
-            {currentCall.type === 'channel' ? 'Channel Call' : 'Direct Call'}
-          </h3>
-          <p className="text-xs text-gray-500">
-            {participants.length} participant{participants.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          <span className="text-xs text-green-400">Live</span>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        {participants.map(participant => (
-          <div
-            key={participant._id}
-            className="flex items-center gap-2 px-2 py-1.5 bg-white/5 rounded-lg"
-          >
-            <Avatar user={participant} size="xs" />
-            <span className="text-xs text-white">
-              {participant._id === user?._id ? 'You' : participant.name?.split(' ')[0]}
-            </span>
-            {participant.isMuted && (
-              <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-              </svg>
-            )}
+    <div className={`fixed z-50 animate-slide-in transition-all duration-300 ${
+      isExpanded 
+        ? 'inset-4 md:inset-8' 
+        : 'bottom-4 right-4 md:bottom-6 md:right-6 w-80 md:w-96'
+    }`}>
+      <div className={`glass rounded-2xl shadow-2xl h-full flex flex-col overflow-hidden ${
+        isExpanded ? '' : 'max-h-[500px]'
+      }`}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/[0.05]">
+          <div>
+            <h3 className="text-sm font-semibold text-white">
+              {currentCall.type === 'channel' ? 'Channel Call' : 'Direct Call'}
+            </h3>
+            <p className="text-xs text-gray-500">
+              {participants.length} participant{participants.length !== 1 ? 's' : ''}
+            </p>
           </div>
-        ))}
-      </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-xs text-green-400">Live</span>
+            </div>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-2 rounded-lg hover:bg-white/[0.05] text-gray-400 hover:text-white transition-colors"
+            >
+              {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
 
-      <div className="flex items-center justify-center gap-3">
-        <button
-          onClick={toggleMute}
-          className={`p-3 rounded-full transition-colors ${
-            isMuted 
-              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
-              : 'bg-white/10 text-white hover:bg-white/20'
-          }`}
-        >
-          {isMuted ? (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-            </svg>
-          ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-            </svg>
+        {/* Video Grid */}
+        <div className={`flex-1 p-3 overflow-hidden ${
+          isExpanded ? 'grid grid-cols-2 gap-3' : 'space-y-3'
+        }`}>
+          {/* Local video */}
+          <div className="relative rounded-xl overflow-hidden bg-black/50 aspect-video">
+            {isVideoEnabled ? (
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover mirror"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Avatar user={user} size="lg" />
+              </div>
+            )}
+            <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/60 text-xs text-white">
+              You {isMuted && '(muted)'}
+            </div>
+          </div>
+
+          {/* Remote videos */}
+          {otherParticipants.map(participant => (
+            <div key={participant._id} className="relative rounded-xl overflow-hidden bg-black/50 aspect-video">
+              {participant.stream && participant.stream.getVideoTracks().length > 0 ? (
+                <video
+                  ref={el => { remoteVideoRefs.current[participant._id] = el }}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Avatar user={participant} size="lg" />
+                </div>
+              )}
+              <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-black/60 text-xs text-white flex items-center gap-1">
+                {participant.name?.split(' ')[0]}
+                {participant.isMuted && <MicOff className="w-3 h-3 text-red-400" />}
+              </div>
+            </div>
+          ))}
+
+          {/* Empty state for waiting */}
+          {otherParticipants.length === 0 && (
+            <div className="rounded-xl bg-white/[0.02] border border-dashed border-white/10 aspect-video flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-10 h-10 rounded-full bg-white/[0.05] flex items-center justify-center mx-auto mb-2">
+                  <Video className="w-5 h-5 text-gray-500" />
+                </div>
+                <p className="text-xs text-gray-500">Waiting for others...</p>
+              </div>
+            </div>
           )}
-        </button>
+        </div>
 
-        <button
-          onClick={toggleVideo}
-          className={`p-3 rounded-full transition-colors ${
-            isVideoEnabled 
-              ? 'bg-white/10 text-white hover:bg-white/20' 
-              : 'bg-white/5 text-gray-500 hover:bg-white/10'
-          }`}
-        >
-          {isVideoEnabled ? (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
-            </svg>
-          )}
-        </button>
+        {/* Controls */}
+        <div className="p-4 border-t border-white/[0.05]">
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={toggleMute}
+              className={`p-3.5 rounded-full transition-all ${
+                isMuted 
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
+                  : 'bg-white/[0.08] text-white hover:bg-white/[0.12]'
+              }`}
+              title={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </button>
 
-        <button
-          onClick={leaveCall}
-          className="p-3 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
-          </svg>
-        </button>
+            <button
+              onClick={toggleVideo}
+              className={`p-3.5 rounded-full transition-all ${
+                isVideoEnabled 
+                  ? 'bg-white/[0.08] text-white hover:bg-white/[0.12]' 
+                  : 'bg-white/[0.05] text-gray-500 hover:bg-white/[0.08]'
+              }`}
+              title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+            >
+              {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+            </button>
+
+            <button
+              onClick={leaveCall}
+              className="p-3.5 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+              title="End call"
+            >
+              <PhoneOff className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -9,7 +9,7 @@ import MessageInput from '../components/MessageInput'
 import UserSearch from '../components/UserSearch'
 import Avatar from '../components/Avatar'
 import * as messageService from '../services/messageService'
-import { Phone, ArrowLeft, MessageSquare, Video } from 'lucide-react'
+import { Phone, ArrowLeft, MessageSquare, Video, ArrowDown } from 'lucide-react'
 
 function DMsPage() {
   const { userId } = useParams()
@@ -75,39 +75,71 @@ function DMsPage() {
     }
   }, [messages, isFetchingMore])
 
-  // Mobile keyboard handling - state based
+  // Mobile keyboard handling - robust scroll approach
+  // Mobile keyboard handling - robust scroll approach
   const inputRef = useRef(null)
   const inputContainerRef = useRef(null)
+  const chatAreaRef = useRef(null)
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
+  
+  // Scroll button state
+  const [showScrollButton, setShowScrollButton] = useState(false)
 
   useEffect(() => {
-    if (!window.visualViewport) return;
-
-    const viewport = window.visualViewport;
-    const initialHeight = window.innerHeight;
-
-    const handleViewportResize = () => {
-      const keyboardHeight = initialHeight - viewport.height;
-
-      // Keyboard open if height reduced by more than 100px
-      if (keyboardHeight > 100) {
-        setIsKeyboardOpen(true);
-      } else {
-        setIsKeyboardOpen(false);
+    let scrollTimeoutId = null;
+    
+    const scrollToInput = () => {
+      // Clear any pending scroll
+      if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
+      
+      // Scroll the chat area to bottom so input is visible
+      if (chatAreaRef.current) {
+        chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
       }
-
-      // Scroll to bottom
-      setTimeout(() => {
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
-        }
-      }, 100);
+      // Also use scrollIntoView on messages end
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
     };
 
-    viewport.addEventListener('resize', handleViewportResize);
+    const handleViewportChange = () => {
+      if (window.visualViewport) {
+        const viewport = window.visualViewport;
+        const heightDiff = window.innerHeight - viewport.height;
+        // If keyboard is open (height difference > 100px)
+        if (heightDiff > 100) {
+          setIsKeyboardOpen(true);
+          scrollToInput();
+        } else {
+          setIsKeyboardOpen(false);
+        }
+      }
+    };
+
+    const handleInputFocus = () => {
+      // Immediate scroll
+      scrollToInput();
+      // Single backup scroll after keyboard opens
+      scrollTimeoutId = setTimeout(scrollToInput, 300);
+    };
+
+    // Listen for visual viewport changes
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+    }
+
+    // Listen for input focus
+    const input = inputRef.current;
+    if (input) {
+      input.addEventListener('focus', handleInputFocus);
+    }
 
     return () => {
-      viewport.removeEventListener('resize', handleViewportResize);
+      if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportChange);
+      }
+      if (input) {
+        input.removeEventListener('focus', handleInputFocus);
+      }
     };
   }, [])
 
@@ -367,7 +399,7 @@ function DMsPage() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-hidden flex flex-col">
+              <div ref={chatAreaRef} className="flex-1 overflow-hidden flex flex-col relative">
                 {loading ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
@@ -380,8 +412,21 @@ function DMsPage() {
                     hasMore={hasMore}
                     isFetchingMore={isFetchingMore}
                     bottomRef={messagesEndRef}
+                    onScrollChange={setShowScrollButton}
                   />
                 )}
+
+                {/* Scroll to Bottom Button */}
+                {showScrollButton && (
+                  <button
+                    onClick={() => scrollToBottom('smooth')}
+                    className="absolute bottom-0 right-2 p-2 rounded-full bg-white text-gray-800 shadow-md hover:shadow-lg hover:scale-110 transition-all duration-200 z-40 flex items-center justify-center"
+                    title="Scroll to bottom"
+                  >
+                    <ArrowDown className="w-2 h-2" />
+                  </button>
+                )}
+
                 <div ref={inputContainerRef} className={`shrink-0 bg-black ${isKeyboardOpen ? 'pb-20' : 'pb-4'}`}>
                   <MessageInput
                     onSendMessage={handleSendMessage}

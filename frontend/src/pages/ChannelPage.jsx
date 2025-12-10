@@ -6,7 +6,7 @@ import { useCall } from '../context/CallContext'
 import MessageList from '../components/MessageList'
 import MessageInput from '../components/MessageInput'
 import * as messageService from '../services/messageService'
-import { Hash, Phone, Users, Video } from 'lucide-react'
+import { Hash, Phone, Users, Video, ArrowDown } from 'lucide-react'
 
 function ChannelPage() {
   const { channelId } = useParams()
@@ -23,25 +23,70 @@ function ChannelPage() {
   const [isFetchingMore, setIsFetchingMore] = useState(false)
   const messagesEndRef = useRef(null)
 
-  // Mobile keyboard scroll handling - auto-scroll when viewport shrinks
+  // Mobile keyboard handling - robust scroll approach
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
+  const inputRef = useRef(null)
+  const chatAreaRef = useRef(null)
+  
+  // Scroll button state
+  const [showScrollButton, setShowScrollButton] = useState(false)
+
   useEffect(() => {
-    const handleViewportResize = () => {
-      if (messagesEndRef.current) {
-        requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
-        })
+    let scrollTimeoutId = null;
+    
+    const scrollToInput = () => {
+      // Clear any pending scroll
+      if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
+      
+      // Scroll the chat area to bottom so input is visible
+      if (chatAreaRef.current) {
+        chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
       }
+      // Also use scrollIntoView on messages end
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
+    };
+
+    const handleViewportChange = () => {
+      if (window.visualViewport) {
+        const viewport = window.visualViewport;
+        const heightDiff = window.innerHeight - viewport.height;
+        // If keyboard is open (height difference > 100px)
+        if (heightDiff > 100) {
+          setIsKeyboardOpen(true);
+          scrollToInput();
+        } else {
+          setIsKeyboardOpen(false);
+        }
+      }
+    };
+
+    const handleInputFocus = () => {
+      // Immediate scroll
+      scrollToInput();
+      // Single backup scroll after keyboard opens
+      scrollTimeoutId = setTimeout(scrollToInput, 300);
+    };
+
+    // Listen for visual viewport changes
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
     }
 
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportResize)
+    // Listen for input focus
+    const input = inputRef.current;
+    if (input) {
+      input.addEventListener('focus', handleInputFocus);
     }
 
     return () => {
+      if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleViewportResize)
+        window.visualViewport.removeEventListener('resize', handleViewportChange);
       }
-    }
+      if (input) {
+        input.removeEventListener('focus', handleInputFocus);
+      }
+    };
   }, [])
 
   useEffect(() => {
@@ -274,7 +319,7 @@ function ChannelPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div ref={chatAreaRef} className="flex-1 overflow-hidden flex flex-col relative">
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
@@ -287,14 +332,29 @@ function ChannelPage() {
             hasMore={hasMore}
             isFetchingMore={isFetchingMore}
             bottomRef={messagesEndRef}
+            onScrollChange={setShowScrollButton}
           />
+        )}
+
+        {/* Scroll to Bottom Button */}
+        {showScrollButton && (
+          <button
+            onClick={() => scrollToBottom('smooth')}
+            className="absolute bottom-2 right-4 p-2 rounded-full bg-white text-gray-800 shadow-md hover:shadow-lg hover:scale-110 transition-all duration-200 z-40 flex items-center justify-center"
+            title="Scroll to bottom"
+          >
+            <ArrowDown className="w-2 h-2" />
+          </button>
         )}
       </div>
 
-      <MessageInput 
-        onSendMessage={handleSendMessage} 
-        placeholder={`Message #${channel.name?.replace('#', '') || 'channel'}`} 
-      />
+      <div className={`shrink-0 bg-black ${isKeyboardOpen ? 'pb-20' : 'pb-4'}`}>
+        <MessageInput 
+          onSendMessage={handleSendMessage} 
+          placeholder={`Message #${channel.name?.replace('#', '') || 'channel'}`}
+          inputRef={inputRef}
+        />
+      </div>
     </div>
   )
 }

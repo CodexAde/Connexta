@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import Avatar from './Avatar'
 
-function MessageList({ messages, currentUserId, onLoadMore, hasMore, isFetchingMore, bottomRef }) {
+function MessageList({ messages, currentUserId, onLoadMore, hasMore, isFetchingMore, bottomRef, onScrollChange }) {
   const scrollRef = useRef(null)
   
   const handleScroll = (e) => {
@@ -12,6 +12,14 @@ function MessageList({ messages, currentUserId, onLoadMore, hasMore, isFetchingM
         // managing state updates or calculating scroll height diff.
         // Since React state update is async, we can't easily restore scroll here synchronously.
       });
+    }
+
+    // Notify parent about scroll position for scroll-to-bottom button
+    if (onScrollChange) {
+      const { scrollTop, scrollHeight, clientHeight } = e.target;
+      // Show button if we are more than 200px away from bottom
+      const isDistanceFromBottom = scrollHeight - scrollTop - clientHeight > 200;
+      onScrollChange(isDistanceFromBottom);
     }
   }
 

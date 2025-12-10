@@ -91,7 +91,7 @@ function MessageInput({ onSendMessage, placeholder = 'Type a message...', onFocu
             onFocus={onFocus}
             placeholder={placeholder}
             rows={1}
-            className="input-field resize-none min-h-[48px] max-h-32 pr-12 text-sm md:text-base"
+            className="input-field resize-none min-h-[48px] max-h-32 pr-12 text-sm md:text-base py-3"
             style={{ height: 'auto' }}
             onInput={(e) => {
               e.target.style.height = 'auto'
@@ -125,7 +125,7 @@ function MessageInput({ onSendMessage, placeholder = 'Type a message...', onFocu
         <button
           type="submit"
           disabled={(!content.trim() && attachments.length === 0) || uploading}
-          className="btn-primary p-3 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+          className="btn-primary w-12 h-12 flex items-center justify-center rounded-xl disabled:opacity-30 disabled:cursor-not-allowed shrink-0 p-0"
         >
           <Send className="w-5 h-5" />
         </button>

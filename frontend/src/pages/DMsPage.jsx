@@ -359,11 +359,15 @@ function DMsPage() {
                 )}
               </div>
 
-              <MessageInput
+              <MessageInput 
                 onSendMessage={handleSendMessage}
                 placeholder={`Message ${selectedUser.name}`}
-                onFocus={() => scrollToBottom('auto')}
-
+                onFocus={() => {
+                  scrollToBottom('auto')
+                  // Additional scrolls to handle keyboard animation
+                  setTimeout(() => scrollToBottom('auto'), 100)
+                  setTimeout(() => scrollToBottom('auto'), 300)
+                }}
               />
             </>
           ) : (

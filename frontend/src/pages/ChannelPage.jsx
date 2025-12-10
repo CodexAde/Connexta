@@ -340,10 +340,11 @@ function ChannelPage() {
         {showScrollButton && (
           <button
             onClick={() => scrollToBottom('smooth')}
+            onMouseDown={(e) => e.preventDefault()}
             className="absolute bottom-2 right-4 p-2 rounded-full bg-white text-gray-800 shadow-md hover:shadow-lg hover:scale-110 transition-all duration-200 z-40 flex items-center justify-center"
             title="Scroll to bottom"
           >
-            <ArrowDown className="w-2 h-2" />
+            <ArrowDown className="w-5 h-5" />
           </button>
         )}
       </div>

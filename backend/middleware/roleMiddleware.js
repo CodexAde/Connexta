@@ -15,6 +15,8 @@ export const checkDirectorAccess = async (req, res, next) => {
   }
 };
 
+import mongoose from 'mongoose';
+
 export const checkChannelAccess = async (req, res, next) => {
   try {
     const channelId = req.params.channelId || req.body.channelId;
@@ -23,12 +25,19 @@ export const checkChannelAccess = async (req, res, next) => {
       return next();
     }
     
-    const channel = await Channel.findById(channelId);
+    let channel;
+    if (mongoose.Types.ObjectId.isValid(channelId)) {
+      channel = await Channel.findById(channelId);
+    } else {
+      channel = await Channel.findOne({ slug: channelId });
+    }
     
     if (!channel) {
       return res.status(404).json({ message: 'Channel not found' });
     }
     
+    // Pass user to logic if available, otherwise just channel check (if logic supports it)
+    // Assuming req.user is populated by authMiddleware running before this
     if (!canAccessChannel(req.user, channel)) {
       return res.status(403).json({ message: 'Access denied to this channel' });
     }
@@ -36,6 +45,7 @@ export const checkChannelAccess = async (req, res, next) => {
     req.channel = channel;
     next();
   } catch (error) {
+    console.error('CheckChannelAccess Error:', error);
     return res.status(500).json({ message: 'Server error' });
   }
 };

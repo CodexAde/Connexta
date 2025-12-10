@@ -76,42 +76,87 @@ function DMsPage() {
     }
   }, [messages, isFetchingMore])
 
-  // Handle mobile keyboard
-  // Handle mobile keyboard and window resize - using ResizeObserver for robustness
+  // Mobile keyboard scroll handling - like ChatGPT (instant scroll)
+  const inputContainerRef = useRef(null)
+  const chatAreaRef = useRef(null) // This will point to the messages container (currently main flex-1 div)
+  const inputRef = useRef(null)
+
   useEffect(() => {
-    // Scroll to bottom on any resize (keyboard open/close)
-    const handleResize = () => {
-      scrollToBottom('auto')
+    const initialInnerHeight = window.innerHeight;
+    let rafId = null;
+    let timeoutId = null;
+
+    const applyKeyboardAdjust = (keyboardHeight) => {
+      // apply padding to input area so it sits above the keyboard
+      if (inputContainerRef.current) {
+        inputContainerRef.current.style.paddingBottom = `${keyboardHeight}px`;
+      }
+      
+      // Force scroll on the ACTUAL scrollable container
+      if (messagesEndRef.current?.parentElement) {
+         const scrollContainer = messagesEndRef.current.parentElement;
+         scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+      
+      // Fallback scroll into view
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+    };
+
+    const computeKeyboardHeight = () => {
+      if (window.visualViewport) {
+        const v = window.visualViewport;
+        // keyboard height approximation: difference between outer innerHeight and visual viewport visible height + offset
+        return Math.max(0, window.innerHeight - (v.height + (v.offsetTop || 0)));
+      }
+      // fallback: compare to initial innerHeight
+      return Math.max(0, initialInnerHeight - window.innerHeight);
+    };
+
+    const handleViewportChange = () => {
+      const kb = computeKeyboardHeight();
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => applyKeyboardAdjust(kb));
+      // backup delayed adjust for devices that update slowly
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => applyKeyboardAdjust(kb), 300);
+    };
+
+    const handleInputFocus = () => {
+      // small delay to let keyboard start opening, then adjust
+      setTimeout(handleViewportChange, 50);
+    };
+
+    const handleInputBlur = () => {
+      // reset styles when keyboard hides
+      if (inputContainerRef.current) inputContainerRef.current.style.paddingBottom = '';
+      if (chatAreaRef.current) chatAreaRef.current.style.paddingBottom = '';
+    };
+
+    // listeners
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      window.visualViewport.addEventListener('scroll', handleViewportChange);
+    } else {
+      window.addEventListener('resize', handleViewportChange);
     }
 
-    // Use ResizeObserver to detect container size changes
-    const resizeObserver = new ResizeObserver(() => {
-      handleResize()
-    })
-
-    // Observe the main container if available (we'll capture it via a ref if needed, or document.body)
-    // Better to observe the message list container or the page itself.
-    // Let's rely on window resize + visualViewport for now, plus a specific ResizeObserver on the document body
-    // to catch the --app-height change effects.
-    
-    resizeObserver.observe(document.body)
-    window.addEventListener('resize', handleResize)
-
-    const viewport = window.visualViewport
-    if (viewport) {
-      viewport.addEventListener('resize', handleResize)
-      viewport.addEventListener('scroll', handleResize)
-    }
+    const inputEl = inputRef.current;
+    inputEl?.addEventListener('focus', handleInputFocus);
+    inputEl?.addEventListener('blur', handleInputBlur);
 
     return () => {
-      resizeObserver.disconnect()
-      window.removeEventListener('resize', handleResize)
-      if (viewport) {
-        viewport.removeEventListener('resize', handleResize)
-        viewport.removeEventListener('scroll', handleResize)
+      if (rafId) cancelAnimationFrame(rafId);
+      if (timeoutId) clearTimeout(timeoutId);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleViewportChange);
+      } else {
+        window.removeEventListener('resize', handleViewportChange);
       }
-    }
-  }, [])
+      inputEl?.removeEventListener('focus', handleInputFocus);
+      inputEl?.removeEventListener('blur', handleInputBlur);
+    };
+  }, []);
 
   const loadDMUser = async (id) => {
     let foundUser = users.find(u => u._id === id)
@@ -369,7 +414,10 @@ function DMsPage() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-hidden flex flex-col">
+              <div 
+                ref={chatAreaRef}
+                className="flex-1 overflow-hidden flex flex-col"
+              >
                 {loading ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
@@ -386,16 +434,13 @@ function DMsPage() {
                 )}
               </div>
 
-              <MessageInput 
-                onSendMessage={handleSendMessage}
-                placeholder={`Message ${selectedUser.name}`}
-                onFocus={() => {
-                  scrollToBottom('auto')
-                  // Additional scrolls to handle keyboard animation
-                  setTimeout(() => scrollToBottom('auto'), 100)
-                  setTimeout(() => scrollToBottom('auto'), 300)
-                }}
-              />
+              <div ref={inputContainerRef} className="shrink-0 bg-black">
+                <MessageInput 
+                  onSendMessage={handleSendMessage}
+                  placeholder={`Message ${selectedUser.name}`}
+                  inputRef={inputRef}
+                />
+              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">

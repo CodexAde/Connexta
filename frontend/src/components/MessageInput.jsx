@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import * as uploadService from '../services/uploadService'
 import { Paperclip, Send, X, File } from 'lucide-react'
 
-function MessageInput({ onSendMessage, placeholder = 'Type a message...', onFocus }) {
+function MessageInput({ onSendMessage, placeholder = 'Type a message...', onFocus, inputRef }) {
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -85,6 +85,7 @@ function MessageInput({ onSendMessage, placeholder = 'Type a message...', onFocu
       <form onSubmit={handleSubmit} className="flex items-end gap-2 md:gap-3">
         <div className="flex-1 relative">
           <textarea
+            ref={inputRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}

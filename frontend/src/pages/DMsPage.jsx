@@ -72,7 +72,7 @@ function DMsPage() {
   // Scroll on new messages
   useEffect(() => {
     if (messages.length > 0 && !isFetchingMore) {
-        scrollToBottom('smooth')
+      scrollToBottom('smooth')
     }
   }, [messages, isFetchingMore])
 
@@ -109,7 +109,7 @@ function DMsPage() {
 
   const loadDMChannel = async () => {
     if (!selectedUser) return
-    
+
     try {
       setLoading(true)
       const channel = await getOrCreateDMChannel(selectedUser._id)
@@ -125,16 +125,16 @@ function DMsPage() {
 
   const loadMessages = async (pageNum = 1, isLoadMore = false, channelIdOverride = null) => {
     if (!selectedUser) return
-    
+
     try {
       if (!isLoadMore) setLoading(true)
       else setIsFetchingMore(true)
 
       // Use getDMMessages via message service
       const data = await messageService.getDMMessages(selectedUser._id, pageNum)
-      
+
       const newMessages = data.messages || []
-      
+
       if (newMessages.length < 50) {
         setHasMore(false)
       } else {
@@ -147,7 +147,7 @@ function DMsPage() {
         setMessages(newMessages)
         setTimeout(() => scrollToBottom('auto'), 50)
       }
-      
+
       setPage(pageNum)
     } catch (error) {
       console.error('Failed to load messages:', error)
@@ -193,7 +193,7 @@ function DMsPage() {
 
   const handleStartCall = async (withVideo = false) => {
     if (!dmChannel?._id || inCall) return
-    
+
     try {
       const ongoingCall = ongoingCalls[dmChannel._id]
       if (ongoingCall) {
@@ -201,7 +201,7 @@ function DMsPage() {
         navigate('/call')
         return
       }
-      
+
       const call = await startCall('dm', dmChannel._id, selectedUser._id, withVideo)
       if (call) {
         navigate('/call')
@@ -210,15 +210,15 @@ function DMsPage() {
       console.error('Failed to start call:', error)
     }
   }
-  
+
   const handleJoinOngoingCall = async () => {
-     const ongoingCall = ongoingCalls[dmChannel?._id]
-     if (ongoingCall) {
-       await joinCall(ongoingCall)
-       navigate('/call')
-     }
+    const ongoingCall = ongoingCalls[dmChannel?._id]
+    if (ongoingCall) {
+      await joinCall(ongoingCall)
+      navigate('/call')
+    }
   }
-  
+
   const activeCall = dmChannel ? ongoingCalls[dmChannel._id] : null
 
   const handleBack = () => {
@@ -239,7 +239,7 @@ function DMsPage() {
           <h2 className="text-xl font-bold text-white mb-4">Messages</h2>
           <UserSearch onUserSelect={(u) => navigate(`/app/dm/${u._id}`)} />
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-2">
           {dmChannels.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
@@ -252,25 +252,23 @@ function DMsPage() {
               {dmChannels.map(channel => {
                 const otherUser = getOtherUser(channel)
                 if (!otherUser) return null
-                
+
                 return (
                   <button
                     key={channel._id}
                     onClick={() => handleUserSelect(otherUser)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                      selectedUser?._id === otherUser._id
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${selectedUser?._id === otherUser._id
                         ? 'bg-white/[0.08] text-white'
                         : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
-                    }`}
+                      }`}
                   >
                     <Avatar user={otherUser} size="sm" />
                     <div className="flex-1 min-w-0 text-left">
                       <p className="font-medium truncate">{otherUser.name}</p>
                       <p className="text-xs text-gray-600 truncate">{otherUser.department}</p>
                     </div>
-                    <div className={`w-2 h-2 rounded-full ${
-                      otherUser.status === 'online' ? 'bg-green-500' : 'bg-gray-600'
-                    }`}></div>
+                    <div className={`w-2 h-2 rounded-full ${otherUser.status === 'online' ? 'bg-green-500' : 'bg-gray-600'
+                      }`}></div>
                   </button>
                 )
               })}
@@ -287,7 +285,7 @@ function DMsPage() {
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
                 <div className="flex items-center gap-3">
-                  <button 
+                  <button
                     onClick={handleBack}
                     className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white"
                   >
@@ -310,7 +308,7 @@ function DMsPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   {activeCall ? (
                     <button
@@ -324,14 +322,14 @@ function DMsPage() {
                     </button>
                   ) : (
                     <>
-                      <button 
+                      <button
                         onClick={() => handleStartCall(false)}
                         disabled={inCall}
                         className="p-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-white transition-colors disabled:opacity-50"
                       >
                         <Phone className="w-5 h-5" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleStartCall(true)}
                         disabled={inCall}
                         className="p-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-white transition-colors disabled:opacity-50"
@@ -350,9 +348,9 @@ function DMsPage() {
                     <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
                   </div>
                 ) : (
-                   <MessageList 
-                    messages={messages} 
-                    currentUserId={user?._id} 
+                  <MessageList
+                    messages={messages}
+                    currentUserId={user?._id}
                     onLoadMore={handleScrollTop}
                     hasMore={hasMore}
                     isFetchingMore={isFetchingMore}
@@ -361,22 +359,24 @@ function DMsPage() {
                 )}
               </div>
 
-              <MessageInput 
+              <MessageInput
                 onSendMessage={handleSendMessage}
                 placeholder={`Message ${selectedUser.name}`}
+                onFocus={() => scrollToBottom('auto')}
+
               />
             </>
           ) : (
-             <div className="flex-1 flex items-center justify-center">
-                <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-             </div>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+            </div>
           )}
         </div>
       ) : (
         <div className="hidden md:flex flex-1 items-center justify-center text-gray-500">
           <div className="text-center">
-             <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-20" />
-             <p>Select a conversation to start messaging</p>
+            <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-20" />
+            <p>Select a conversation to start messaging</p>
           </div>
         </div>
       )}

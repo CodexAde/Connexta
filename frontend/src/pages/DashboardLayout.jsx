@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import Topbar from '../components/Topbar'
@@ -10,8 +10,31 @@ function DashboardLayout() {
   const { incomingCall } = useCall()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Handle dynamic viewport height for mobile keyboard
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        const height = window.visualViewport.height
+        document.documentElement.style.setProperty('--app-height', `${height}px`)
+      }
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize)
+      window.visualViewport.addEventListener('scroll', handleResize)
+      handleResize() // Initial set
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize)
+        window.visualViewport.removeEventListener('scroll', handleResize)
+      }
+    }
+  }, [])
+
   return (
-    <div className="flex h-[100dvh] bg-black overflow-hidden">
+    <div className="flex h-[100dvh] md:h-screen bg-black overflow-hidden" style={{ height: 'var(--app-height, 100dvh)' }}>
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 

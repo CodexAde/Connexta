@@ -26,22 +26,18 @@ export const initializeSocketManager = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.user.name}`);
     connectedUsers.set(socket.user._id.toString(), socket.id);
 
     socket.on('join:channel', (channelId) => {
       socket.join(`channel:${channelId}`);
-      console.log(`${socket.user.name} joined channel: ${channelId}`);
     });
 
     socket.on('leave:channel', (channelId) => {
       socket.leave(`channel:${channelId}`);
-      console.log(`${socket.user.name} left channel: ${channelId}`);
     });
 
     socket.on('join:dm', (dmRoomId) => {
       socket.join(`dm:${dmRoomId}`);
-      console.log(`${socket.user.name} joined DM: ${dmRoomId}`);
     });
 
     socket.on('leave:dm', (dmRoomId) => {
@@ -117,7 +113,6 @@ export const initializeSocketManager = (io) => {
     });
 
     socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.user.name}`);
       connectedUsers.delete(socket.user._id.toString());
     });
   });

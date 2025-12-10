@@ -77,25 +77,41 @@ function DMsPage() {
   }, [messages, isFetchingMore])
 
   // Handle mobile keyboard
+  // Handle mobile keyboard and window resize - using ResizeObserver for robustness
   useEffect(() => {
-    const viewport = viewportRef.current
-    if (!viewport) return
-
+    // Scroll to bottom on any resize (keyboard open/close)
     const handleResize = () => {
-      if (messagesEndRef.current) {
-        // Use 'auto' for instant scrolling when keyboard works
-        scrollToBottom('auto')
-      }
+      scrollToBottom('auto')
     }
 
-    viewport.addEventListener('resize', handleResize)
-    viewport.addEventListener('scroll', handleResize)
+    // Use ResizeObserver to detect container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize()
+    })
+
+    // Observe the main container if available (we'll capture it via a ref if needed, or document.body)
+    // Better to observe the message list container or the page itself.
+    // Let's rely on window resize + visualViewport for now, plus a specific ResizeObserver on the document body
+    // to catch the --app-height change effects.
+    
+    resizeObserver.observe(document.body)
+    window.addEventListener('resize', handleResize)
+
+    const viewport = window.visualViewport
+    if (viewport) {
+      viewport.addEventListener('resize', handleResize)
+      viewport.addEventListener('scroll', handleResize)
+    }
 
     return () => {
-      viewport.removeEventListener('resize', handleResize)
-      viewport.removeEventListener('scroll', handleResize)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', handleResize)
+      if (viewport) {
+        viewport.removeEventListener('resize', handleResize)
+        viewport.removeEventListener('scroll', handleResize)
+      }
     }
-  }, [dmChannel])
+  }, [])
 
   const loadDMUser = async (id) => {
     let foundUser = users.find(u => u._id === id)
@@ -164,6 +180,17 @@ function DMsPage() {
   }
 
   const scrollToBottom = (behavior = 'smooth') => {
+    // Priority: Set container scrollTop directly
+    if (messagesEndRef.current?.parentElement) {
+       const container = messagesEndRef.current.parentElement
+       // Use smooth only if explicitly requested and difference is large? 
+       // For keyboard 'auto' is better.
+       container.scrollTo({
+         top: container.scrollHeight,
+         behavior: behavior
+       })
+    }
+    // Backup
     messagesEndRef.current?.scrollIntoView({ behavior })
   }
 

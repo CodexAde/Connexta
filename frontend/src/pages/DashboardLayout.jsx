@@ -11,24 +11,50 @@ function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Handle dynamic viewport height for mobile keyboard
+  // Handle dynamic viewport height for mobile keyboard
+  // Formula: keyboardHeight = initialViewportHeight - currentVisualViewportHeight
+  // We use this to set the app height to the *visible* area, effectively shrinking it above the keyboard.
   useEffect(() => {
+    // Store initial height
+    const getViewportHeight = () => {
+      return window.visualViewport ? window.visualViewport.height : window.innerHeight
+    }
+    
+    let initialHeight = getViewportHeight()
+
     const handleResize = () => {
-      if (window.visualViewport) {
-        const height = window.visualViewport.height
-        document.documentElement.style.setProperty('--app-height', `${height}px`)
+      const currentHeight = getViewportHeight()
+      
+      // Calculate keyboard height (for debugging or potential future use)
+      const keyboardHeight = initialHeight - currentHeight
+      
+      // If significant difference (keyboard open), or even if just resizing, update height
+      // We check if it's smaller, effectively.
+      // But actually, we just want the app to always fill the visible area on mobile.
+      document.documentElement.style.setProperty('--app-height', `${currentHeight}px`)
+
+      // If we are back to near initial height, ensure we reset to 100dvh equivalent or initial
+      if (Math.abs(keyboardHeight) < 50) {
+         // Keyboard likely closed
+         // Optionally reset or keep updating. Updating is safer.
       }
     }
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleResize)
       window.visualViewport.addEventListener('scroll', handleResize)
-      handleResize() // Initial set
+    } else {
+      window.addEventListener('resize', handleResize)
     }
+
+    handleResize() // Initial set
 
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleResize)
         window.visualViewport.removeEventListener('scroll', handleResize)
+      } else {
+        window.removeEventListener('resize', handleResize)
       }
     }
   }, [])

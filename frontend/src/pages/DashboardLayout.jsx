@@ -11,7 +11,7 @@ function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex h-screen bg-black overflow-hidden">
+    <div className="flex h-[100dvh] bg-black overflow-hidden">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 

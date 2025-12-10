@@ -28,6 +28,7 @@ function DMsPage() {
   const [hasMore, setHasMore] = useState(true)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
   const messagesEndRef = useRef(null)
+  const viewportRef = useRef(window.visualViewport)
 
   useEffect(() => {
     if (userId) {
@@ -74,6 +75,27 @@ function DMsPage() {
         scrollToBottom('smooth')
     }
   }, [messages, isFetchingMore])
+
+  // Handle mobile keyboard
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    const handleResize = () => {
+      if (messagesEndRef.current) {
+        // Use 'auto' for instant scrolling when keyboard works
+        scrollToBottom('auto')
+      }
+    }
+
+    viewport.addEventListener('resize', handleResize)
+    viewport.addEventListener('scroll', handleResize)
+
+    return () => {
+      viewport.removeEventListener('resize', handleResize)
+      viewport.removeEventListener('scroll', handleResize)
+    }
+  }, [dmChannel])
 
   const loadDMUser = async (id) => {
     let foundUser = users.find(u => u._id === id)

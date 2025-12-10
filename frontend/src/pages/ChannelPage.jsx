@@ -23,6 +23,27 @@ function ChannelPage() {
   const [isFetchingMore, setIsFetchingMore] = useState(false)
   const messagesEndRef = useRef(null)
 
+  // Mobile keyboard scroll handling - auto-scroll when viewport shrinks
+  useEffect(() => {
+    const handleViewportResize = () => {
+      if (messagesEndRef.current) {
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
+        })
+      }
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize)
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     loadChannel()
   }, [channelId, channels])

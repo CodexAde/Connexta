@@ -109,6 +109,30 @@ body {
   z-index: 10;
 }
 
+/* Mobile chat container - uses dynamic viewport height */
+.mobile-chat-container {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height - adjusts for keyboard */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Messages area that fills available space before input */
+.mobile-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0; /* Important for flex children to shrink */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Input stays at bottom, pushes up with keyboard */
+.mobile-input-area {
+  flex-shrink: 0;
+  background: #000;
+}
+
 /* Viewport resize handling for keyboard */
 @media (max-width: 768px) {
   html {
@@ -118,6 +142,18 @@ body {
   body {
     min-height: 100vh;
     min-height: -webkit-fill-available;
+  }
+  
+  /* Ensure the app container uses dvh on mobile */
+  .h-full {
+    height: 100dvh;
+  }
+}
+
+/* Ensure input stays above virtual keyboard */
+@supports (padding-bottom: env(keyboard-inset-height)) {
+  .keyboard-aware-padding {
+    padding-bottom: env(keyboard-inset-height, 0);
   }
 }
 

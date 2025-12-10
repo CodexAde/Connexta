@@ -28,7 +28,6 @@ function DMsPage() {
   const [hasMore, setHasMore] = useState(true)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
   const messagesEndRef = useRef(null)
-  const viewportRef = useRef(window.visualViewport)
 
   useEffect(() => {
     if (userId) {
@@ -76,87 +75,36 @@ function DMsPage() {
     }
   }, [messages, isFetchingMore])
 
-  // Mobile keyboard scroll handling - like ChatGPT (instant scroll)
-  const inputContainerRef = useRef(null)
-  const chatAreaRef = useRef(null) // This will point to the messages container (currently main flex-1 div)
+  // Mobile keyboard scroll handling - simple approach
   const inputRef = useRef(null)
+  const inputContainerRef = useRef(null)
 
   useEffect(() => {
-    const initialInnerHeight = window.innerHeight;
-    let rafId = null;
-    let timeoutId = null;
-
-    const applyKeyboardAdjust = (keyboardHeight) => {
-      // apply padding to input area so it sits above the keyboard
-      if (inputContainerRef.current) {
-        inputContainerRef.current.style.paddingBottom = `${keyboardHeight}px`;
-      }
-      
-      // Force scroll on the ACTUAL scrollable container
-      if (messagesEndRef.current?.parentElement) {
-         const scrollContainer = messagesEndRef.current.parentElement;
-         scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
-      
-      // Fallback scroll into view
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-    };
-
-    const computeKeyboardHeight = () => {
-      if (window.visualViewport) {
-        const v = window.visualViewport;
-        // keyboard height approximation: difference between outer innerHeight and visual viewport visible height + offset
-        return Math.max(0, window.innerHeight - (v.height + (v.offsetTop || 0)));
-      }
-      // fallback: compare to initial innerHeight
-      return Math.max(0, initialInnerHeight - window.innerHeight);
-    };
-
-    const handleViewportChange = () => {
-      const kb = computeKeyboardHeight();
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => applyKeyboardAdjust(kb));
-      // backup delayed adjust for devices that update slowly
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => applyKeyboardAdjust(kb), 300);
-    };
-
-    const handleInputFocus = () => {
-      // small delay to let keyboard start opening, then adjust
-      setTimeout(handleViewportChange, 50);
-    };
-
-    const handleInputBlur = () => {
-      // reset styles when keyboard hides
-      if (inputContainerRef.current) inputContainerRef.current.style.paddingBottom = '';
-      if (chatAreaRef.current) chatAreaRef.current.style.paddingBottom = '';
-    };
-
-    // listeners
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportChange);
-      window.visualViewport.addEventListener('scroll', handleViewportChange);
-    } else {
-      window.addEventListener('resize', handleViewportChange);
+    // When viewport resizes (keyboard opens/closes), scroll input into view
+    const handleViewportResize = () => {
+      // Small delay for keyboard animation to complete
+      setTimeout(() => {
+        // Scroll input into view when keyboard opens
+        if (inputRef.current) {
+          inputRef.current.scrollIntoView({ behavior: 'auto', block: 'nearest' })
+        }
+        // Also scroll messages to bottom
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' })
+        }
+      }, 100)
     }
 
-    const inputEl = inputRef.current;
-    inputEl?.addEventListener('focus', handleInputFocus);
-    inputEl?.addEventListener('blur', handleInputBlur);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize)
+    }
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      if (timeoutId) clearTimeout(timeoutId);
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleViewportChange);
-        window.visualViewport.removeEventListener('scroll', handleViewportChange);
-      } else {
-        window.removeEventListener('resize', handleViewportChange);
+        window.visualViewport.removeEventListener('resize', handleViewportResize)
       }
-      inputEl?.removeEventListener('focus', handleInputFocus);
-      inputEl?.removeEventListener('blur', handleInputBlur);
-    };
-  }, []);
+    }
+  }, [])
 
   const loadDMUser = async (id) => {
     let foundUser = users.find(u => u._id === id)
@@ -351,7 +299,7 @@ function DMsPage() {
 
       {/* Chat Area */}
       {userId ? (
-        <div className={`${!showMobileList ? 'flex' : 'hidden'} md:flex flex-1 flex-col bg-black w-full`}>
+        <div className={`${!showMobileList ? 'flex' : 'hidden'} md:flex flex-1 flex-col bg-black w-full overflow-hidden`}>
           {selectedUser ? (
             <>
               {/* Header */}
@@ -414,10 +362,7 @@ function DMsPage() {
               </div>
 
               {/* Messages */}
-              <div 
-                ref={chatAreaRef}
-                className="flex-1 overflow-hidden flex flex-col"
-              >
+              <div className="flex-1 overflow-hidden flex flex-col">
                 {loading ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
@@ -434,7 +379,7 @@ function DMsPage() {
                 )}
               </div>
 
-              <div ref={inputContainerRef} className="shrink-0 bg-black">
+              <div ref={inputContainerRef} className="shrink-0 bg-black pb-4">
                 <MessageInput 
                   onSendMessage={handleSendMessage}
                   placeholder={`Message ${selectedUser.name}`}

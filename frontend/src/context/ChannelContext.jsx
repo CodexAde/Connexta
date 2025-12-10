@@ -79,10 +79,18 @@ export const ChannelProvider = ({ children }) => {
   const getOrCreateDMChannel = async (userId) => {
     try {
       const data = await channelService.getDMChannel(userId)
-      if (!dmChannels.find(c => c._id === data.channel._id)) {
-        setDmChannels(prev => [...prev, data.channel])
-      }
-      return data.channel
+      const newChannel = data.channel
+      
+      // Check if this channel already exists in the list (by _id)
+      setDmChannels(prev => {
+        const exists = prev.some(c => c._id === newChannel._id)
+        if (exists) {
+          return prev
+        }
+        return [...prev, newChannel]
+      })
+      
+      return newChannel
     } catch (error) {
       console.error('Failed to get DM channel:', error)
       return null

@@ -151,16 +151,16 @@ body {
   /* Improved message bubbles */
   .message-bubble {
     @apply px-4 py-3 bg-white/[0.06] rounded-2xl rounded-bl-sm inline-block;
-    max-width: 75%;
+    max-width: 85%;
     word-wrap: break-word;
-    line-height: 1.5;
+    line-height: 1.6;
   }
 
   .message-bubble-own {
     @apply px-4 py-3 bg-white text-black rounded-2xl rounded-br-sm inline-block;
-    max-width: 75%;
+    max-width: 85%;
     word-wrap: break-word;
-    line-height: 1.5;
+    line-height: 1.6;
   }
 
   .message-bubble p, .message-bubble-own p {

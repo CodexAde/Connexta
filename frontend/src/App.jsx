@@ -47,11 +47,8 @@ const PublicRoute = ({ children }) => {
 function App() {
   return (
     <Routes>
-      {/* Entry point is now login */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      
-      {/* Landing page for marketing */}
-      <Route path="/home" element={<LandingPage />} />
+      {/* Landing page as the main entry point */}
+      <Route path="/" element={<LandingPage />} />
       <Route path="/welcome" element={<LandingPage />} />
       
       <Route path="/login" element={

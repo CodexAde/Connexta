@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import * as uploadService from '../services/uploadService'
 import { Paperclip, Send, X, File } from 'lucide-react'
 
-function MessageInput({ onSendMessage, placeholder = 'Type a message...' }) {
+function MessageInput({ onSendMessage, placeholder = 'Type a message...', onFocus }) {
   const [content, setContent] = useState('')
   const [attachments, setAttachments] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -88,6 +88,7 @@ function MessageInput({ onSendMessage, placeholder = 'Type a message...' }) {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={onFocus}
             placeholder={placeholder}
             rows={1}
             className="input-field resize-none min-h-[48px] max-h-32 pr-12 text-sm md:text-base"

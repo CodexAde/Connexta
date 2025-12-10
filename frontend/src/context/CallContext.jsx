@@ -21,19 +21,125 @@ export const CallProvider = ({ children }) => {
   const [isVideoEnabled, setIsVideoEnabled] = useState(false)
   const [inCall, setInCall] = useState(false)
   const [incomingCall, setIncomingCall] = useState(null)
+  const [ongoingCalls, setOngoingCalls] = useState({}) // Track ongoing calls in channels
   
   const peerConnections = useRef({})
   const remoteStreams = useRef({})
+  const localStreamRef = useRef(null)
+  const currentCallRef = useRef(null)
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    localStreamRef.current = localStream
+  }, [localStream])
+
+  useEffect(() => {
+    currentCallRef.current = currentCall
+  }, [currentCall])
 
   const iceServers = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' }
     ]
   }
 
   useEffect(() => {
     if (!socket) return
+
+    const handleCallStarted = (call) => {
+      // Track ongoing call for this channel/dm
+      const roomKey = call.channel || call.dmRoomId
+      setOngoingCalls(prev => ({ ...prev, [roomKey]: call }))
+      
+      if (call.startedBy._id !== user?._id) {
+        setIncomingCall(call)
+      }
+    }
+
+    const handleUserJoined = async (data) => {
+      console.log('User joined:', data)
+      if (currentCallRef.current && data.user._id !== user?._id) {
+        // Add user to participants if not already there
+        setParticipants(prev => {
+          if (prev.find(p => p._id === data.user._id)) return prev
+          return [...prev, { ...data.user, isMuted: false }]
+        })
+        
+        // Create peer connection as initiator (we were here first)
+        setTimeout(async () => {
+          await createPeerConnection(data.user._id, true)
+        }, 500)
+      }
+    }
+
+    const handleUserLeft = (data) => {
+      setParticipants(prev => prev.filter(p => p._id !== data.userId))
+      if (peerConnections.current[data.userId]) {
+        peerConnections.current[data.userId].close()
+        delete peerConnections.current[data.userId]
+      }
+      if (remoteStreams.current[data.userId]) {
+        delete remoteStreams.current[data.userId]
+      }
+    }
+
+    const handleSignal = async (data) => {
+      const { signalData, fromUserId } = data
+      console.log('Received signal from:', fromUserId, signalData.type || 'ICE')
+      
+      try {
+        if (!peerConnections.current[fromUserId]) {
+          await createPeerConnection(fromUserId, false)
+        }
+        
+        const pc = peerConnections.current[fromUserId]
+        if (!pc) return
+        
+        if (signalData.type === 'offer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(signalData))
+          const answer = await pc.createAnswer()
+          await pc.setLocalDescription(answer)
+          
+          const call = currentCallRef.current
+          socket.emit('call:signal', {
+            roomId: call?.channel || call?.dmRoomId,
+            roomType: call?.type,
+            signalData: answer,
+            targetUserId: fromUserId
+          })
+        } else if (signalData.type === 'answer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(signalData))
+        } else if (signalData.candidate) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(signalData))
+          } catch (e) {
+            console.log('ICE candidate error (may be normal):', e)
+          }
+        }
+      } catch (error) {
+        console.error('Signal handling error:', error)
+      }
+    }
+
+    const handleUserMuted = (data) => {
+      setParticipants(prev => 
+        prev.map(p => p._id === data.userId ? { ...p, isMuted: data.isMuted } : p)
+      )
+    }
+
+    const handleCallEnded = (data) => {
+      const roomKey = data?.roomId
+      if (roomKey) {
+        setOngoingCalls(prev => {
+          const updated = { ...prev }
+          delete updated[roomKey]
+          return updated
+        })
+      }
+      cleanup()
+    }
 
     socket.on('call:started', handleCallStarted)
     socket.on('call:user-joined', handleUserJoined)
@@ -50,108 +156,77 @@ export const CallProvider = ({ children }) => {
       socket.off('call:user-muted', handleUserMuted)
       socket.off('call:ended', handleCallEnded)
     }
-  }, [socket])
-
-  const handleCallStarted = (call) => {
-    if (call.startedBy._id !== user?._id) {
-      setIncomingCall(call)
-    }
-  }
-
-  const handleUserJoined = async (data) => {
-    if (currentCall && data.user._id !== user?._id) {
-      setParticipants(prev => {
-        if (prev.find(p => p._id === data.user._id)) return prev
-        return [...prev, data.user]
-      })
-      await createPeerConnection(data.user._id, true)
-    }
-  }
-
-  const handleUserLeft = (data) => {
-    setParticipants(prev => prev.filter(p => p._id !== data.userId))
-    if (peerConnections.current[data.userId]) {
-      peerConnections.current[data.userId].close()
-      delete peerConnections.current[data.userId]
-    }
-    if (remoteStreams.current[data.userId]) {
-      delete remoteStreams.current[data.userId]
-    }
-  }
-
-  const handleSignal = async (data) => {
-    const { signalData, fromUserId } = data
-    
-    if (!peerConnections.current[fromUserId]) {
-      await createPeerConnection(fromUserId, false)
-    }
-    
-    const pc = peerConnections.current[fromUserId]
-    
-    if (signalData.type === 'offer') {
-      await pc.setRemoteDescription(new RTCSessionDescription(signalData))
-      const answer = await pc.createAnswer()
-      await pc.setLocalDescription(answer)
-      socket.emit('call:signal', {
-        roomId: currentCall?.channel || currentCall?.dmRoomId,
-        roomType: currentCall?.type,
-        signalData: answer,
-        targetUserId: fromUserId
-      })
-    } else if (signalData.type === 'answer') {
-      await pc.setRemoteDescription(new RTCSessionDescription(signalData))
-    } else if (signalData.candidate) {
-      await pc.addIceCandidate(new RTCIceCandidate(signalData))
-    }
-  }
-
-  const handleUserMuted = (data) => {
-    setParticipants(prev => 
-      prev.map(p => p._id === data.userId ? { ...p, isMuted: data.isMuted } : p)
-    )
-  }
-
-  const handleCallEnded = () => {
-    cleanup()
-  }
+  }, [socket, user?._id])
 
   const createPeerConnection = async (userId, initiator) => {
+    console.log('Creating peer connection for:', userId, 'initiator:', initiator)
+    
+    // Close existing connection if any
+    if (peerConnections.current[userId]) {
+      peerConnections.current[userId].close()
+    }
+    
     const pc = new RTCPeerConnection(iceServers)
     peerConnections.current[userId] = pc
 
-    if (localStream) {
-      localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream)
+    // Add local tracks
+    const stream = localStreamRef.current
+    if (stream) {
+      stream.getTracks().forEach(track => {
+        console.log('Adding track:', track.kind)
+        pc.addTrack(track, stream)
       })
     }
 
+    // Handle remote tracks
     pc.ontrack = (event) => {
+      console.log('Received remote track:', event.track.kind)
       remoteStreams.current[userId] = event.streams[0]
       setParticipants(prev => 
         prev.map(p => p._id === userId ? { ...p, stream: event.streams[0] } : p)
       )
     }
 
+    // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
+        const call = currentCallRef.current
         socket.emit('call:signal', {
-          roomId: currentCall?.channel || currentCall?.dmRoomId,
-          roomType: currentCall?.type,
+          roomId: call?.channel || call?.dmRoomId,
+          roomType: call?.type,
           signalData: event.candidate,
           targetUserId: userId
         })
       }
     }
 
+    pc.oniceconnectionstatechange = () => {
+      console.log('ICE state:', pc.iceConnectionState)
+    }
+
+    pc.onconnectionstatechange = () => {
+      console.log('Connection state:', pc.connectionState)
+    }
+
+    // If initiator, create and send offer
     if (initiator) {
-      const offer = await pc.createOffer()
-      await pc.setLocalDescription(offer)
-      socket.emit('call:signal', {
-        roomId: currentCall?.channel || currentCall?.dmRoomId,
-        roomType: currentCall?.type,
-        signalData: offer,
-        targetUserId: userId
-      })
+      try {
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true
+        })
+        await pc.setLocalDescription(offer)
+        
+        const call = currentCallRef.current
+        socket.emit('call:signal', {
+          roomId: call?.channel || call?.dmRoomId,
+          roomType: call?.type,
+          signalData: offer,
+          targetUserId: userId
+        })
+      } catch (error) {
+        console.error('Error creating offer:', error)
+      }
     }
 
     return pc
@@ -159,16 +234,18 @@ export const CallProvider = ({ children }) => {
 
   const startCall = async (type, channelId, recipientId, withVideo = false) => {
     try {
-      // Request media based on options
+      // Request media
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: true, 
         video: withVideo 
       })
       setLocalStream(stream)
+      localStreamRef.current = stream
       setIsVideoEnabled(withVideo)
 
       const data = await callService.createCall({ type, channelId, recipientId })
       setCurrentCall(data.call)
+      currentCallRef.current = data.call
       setParticipants([{ ...user, isMuted: false }])
       setInCall(true)
 
@@ -187,10 +264,12 @@ export const CallProvider = ({ children }) => {
         try {
           const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
           setLocalStream(audioStream)
+          localStreamRef.current = audioStream
           setIsVideoEnabled(false)
           
           const data = await callService.createCall({ type, channelId, recipientId })
           setCurrentCall(data.call)
+          currentCallRef.current = data.call
           setParticipants([{ ...user, isMuted: false }])
           setInCall(true)
 
@@ -213,12 +292,17 @@ export const CallProvider = ({ children }) => {
 
   const joinCall = async (call) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+        .catch(() => navigator.mediaDevices.getUserMedia({ audio: true, video: false }))
+      
       setLocalStream(stream)
+      localStreamRef.current = stream
+      setIsVideoEnabled(stream.getVideoTracks().length > 0)
 
       await callService.joinCall(call._id)
       setCurrentCall(call)
-      setParticipants(call.participants.map(p => ({ ...p, isMuted: false })))
+      currentCallRef.current = call
+      setParticipants(call.participants?.map(p => ({ ...p, isMuted: false })) || [])
       setInCall(true)
       setIncomingCall(null)
 
@@ -282,8 +366,14 @@ export const CallProvider = ({ children }) => {
           localStream.addTrack(videoTrack)
           setIsVideoEnabled(true)
           
+          // Add video track to all peer connections
           Object.values(peerConnections.current).forEach(pc => {
-            pc.addTrack(videoTrack, localStream)
+            const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+            if (sender) {
+              sender.replaceTrack(videoTrack)
+            } else {
+              pc.addTrack(videoTrack, localStream)
+            }
           })
         } catch (error) {
           console.error('Failed to enable video:', error)
@@ -296,9 +386,13 @@ export const CallProvider = ({ children }) => {
     setIncomingCall(null)
   }
 
+  const getOngoingCall = (roomId) => {
+    return ongoingCalls[roomId] || null
+  }
+
   const cleanup = useCallback(() => {
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop())
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop())
     }
     
     Object.values(peerConnections.current).forEach(pc => pc.close())
@@ -306,12 +400,14 @@ export const CallProvider = ({ children }) => {
     remoteStreams.current = {}
     
     setLocalStream(null)
+    localStreamRef.current = null
     setCurrentCall(null)
+    currentCallRef.current = null
     setParticipants([])
     setInCall(false)
     setIsMuted(false)
     setIsVideoEnabled(false)
-  }, [localStream])
+  }, [])
 
   const value = {
     currentCall,
@@ -321,13 +417,15 @@ export const CallProvider = ({ children }) => {
     isVideoEnabled,
     inCall,
     incomingCall,
+    ongoingCalls,
     remoteStreams: remoteStreams.current,
     startCall,
     joinCall,
     leaveCall,
     toggleMute,
     toggleVideo,
-    declineCall
+    declineCall,
+    getOngoingCall
   }
 
   return (

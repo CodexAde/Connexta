@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import ScrollToTop from './components/ScrollToTop'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -47,7 +48,9 @@ const PublicRoute = ({ children }) => {
 
 function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       {/* Landing page as the main entry point */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/welcome" element={<LandingPage />} />
@@ -87,7 +90,8 @@ function App() {
         <Route path="calls" element={<CallRoomPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+      </Routes>
+    </>
   )
 }
 

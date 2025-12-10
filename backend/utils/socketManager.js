@@ -48,10 +48,15 @@ export const initializeSocketManager = (io) => {
       const { roomId, roomType } = data;
       const room = roomType === 'channel' ? `call:channel:${roomId}` : `call:dm:${roomId}`;
       socket.join(room);
+      // Send full user object for proper display
       socket.to(room).emit('call:user-joined', {
-        userId: socket.user._id,
-        userName: socket.user.name,
-        avatarUrl: socket.user.avatarUrl
+        user: {
+          _id: socket.user._id.toString(),
+          name: socket.user.name,
+          email: socket.user.email,
+          avatarUrl: socket.user.avatarUrl,
+          department: socket.user.department
+        }
       });
     });
 

@@ -93,6 +93,42 @@ body {
   body {
     -webkit-overflow-scrolling: touch;
   }
+  
+  /* Use dvh for mobile viewport */
+  .h-screen {
+    height: 100dvh !important;
+  }
+  
+  .min-h-screen {
+    min-height: 100dvh !important;
+  }
+}
+
+/* Mobile keyboard handling - keeps input visible */
+@supports (height: 100dvh) {
+  .mobile-safe-height {
+    height: 100dvh;
+  }
+}
+
+/* Input container that stays above keyboard */
+.input-container-sticky {
+  position: sticky;
+  bottom: 0;
+  background: inherit;
+  z-index: 10;
+}
+
+/* Viewport resize handling for keyboard */
+@media (max-width: 768px) {
+  html {
+    height: -webkit-fill-available;
+  }
+  
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
 }
 
 @layer components {

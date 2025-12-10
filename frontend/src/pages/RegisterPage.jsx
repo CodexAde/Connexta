@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Eye, EyeOff, ArrowRight, Camera, User } from 'lucide-react'
 
 const DEPARTMENTS = [
   'Admin',
@@ -22,6 +23,7 @@ function RegisterPage() {
   })
   const [avatar, setAvatar] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   
@@ -84,23 +86,29 @@ function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-purple-500/5"></div>
-      <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Noise overlay */}
+      <div className="noise-overlay"></div>
+      
+      {/* Background effects */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:60px_60px]" />
+      <div className="absolute top-1/4 right-1/4 w-[400px] h-[400px] bg-white/[0.02] rounded-full blur-[100px]"></div>
+      <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[300px] bg-white/[0.02] rounded-full blur-[80px]"></div>
 
-      <div className="w-full max-w-md relative z-10">
+      <div className="w-full max-w-md relative z-10 animate-slide-up py-8">
+        {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">C</span>
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
+              <span className="text-black font-bold text-2xl">C</span>
             </div>
-            <span className="text-3xl font-bold gradient-text">Connexta</span>
+            <span className="text-2xl font-bold text-white">Connexta</span>
           </Link>
-          <h1 className="text-2xl font-bold text-white mb-2">Create your account</h1>
-          <p className="text-gray-400">Join your team on Connexta</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Create your account</h1>
+          <p className="text-gray-500">Join your team on Connexta</p>
         </div>
 
+        {/* Form Card */}
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
@@ -109,22 +117,21 @@ function RegisterPage() {
               </div>
             )}
 
+            {/* Avatar Upload */}
             <div className="flex justify-center mb-2">
               <div 
                 onClick={() => fileInputRef.current?.click()}
                 className="relative cursor-pointer group"
               >
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-white/5 border-2 border-dashed border-white/20 flex items-center justify-center group-hover:border-indigo-500 transition-colors">
+                <div className="w-20 h-20 rounded-full overflow-hidden bg-white/[0.05] border-2 border-dashed border-white/20 flex items-center justify-center group-hover:border-white/40 transition-all">
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="text-center">
-                      <svg className="w-8 h-8 mx-auto text-gray-500 group-hover:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      <span className="text-xs text-gray-500">Photo</span>
-                    </div>
+                    <User className="w-8 h-8 text-gray-600 group-hover:text-gray-400 transition-colors" />
                   )}
+                </div>
+                <div className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-white flex items-center justify-center">
+                  <Camera className="w-4 h-4 text-black" />
                 </div>
                 <input
                   ref={fileInputRef}
@@ -147,6 +154,7 @@ function RegisterPage() {
                 placeholder="John Doe"
                 className="input-field"
                 required
+                autoComplete="name"
               />
             </div>
 
@@ -161,22 +169,33 @@ function RegisterPage() {
                 placeholder="you@company.com"
                 className="input-field"
                 required
+                autoComplete="email"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="input-label">Password</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className="input-field"
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  className="input-field pr-12"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -199,7 +218,7 @@ function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full flex items-center justify-center gap-2"
+              className="btn-primary w-full flex items-center justify-center gap-2 py-4"
             >
               {loading ? (
                 <>
@@ -207,19 +226,29 @@ function RegisterPage() {
                   Creating account...
                 </>
               ) : (
-                'Create Account'
+                <>
+                  Create Account
+                  <ArrowRight className="w-4 h-4" />
+                </>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-400">
+          <div className="mt-8 text-center">
+            <p className="text-gray-500">
               Already have an account?{' '}
-              <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
+              <Link to="/login" className="text-white hover:underline font-medium">
                 Sign in
               </Link>
             </p>
           </div>
+        </div>
+
+        {/* Back to home */}
+        <div className="mt-8 text-center">
+          <Link to="/" className="text-gray-600 hover:text-gray-400 text-sm transition-colors">
+            ← Back to home
+          </Link>
         </div>
       </div>
     </div>

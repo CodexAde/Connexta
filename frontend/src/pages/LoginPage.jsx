@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Eye, EyeOff, ArrowRight } from 'lucide-react'
 
 function LoginPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   
@@ -37,23 +39,29 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-purple-500/5"></div>
-      <div className="absolute top-1/3 left-1/3 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-1/3 right-1/3 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Noise overlay */}
+      <div className="noise-overlay"></div>
+      
+      {/* Background effects */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:60px_60px]" />
+      <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-white/[0.02] rounded-full blur-[100px]"></div>
+      <div className="absolute bottom-1/3 right-1/4 w-[300px] h-[300px] bg-white/[0.02] rounded-full blur-[80px]"></div>
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">C</span>
+      <div className="w-full max-w-md relative z-10 animate-slide-up">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <Link to="/" className="inline-flex items-center gap-3 mb-8">
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
+              <span className="text-black font-bold text-2xl">C</span>
             </div>
-            <span className="text-3xl font-bold gradient-text">Connexta</span>
+            <span className="text-2xl font-bold text-white">Connexta</span>
           </Link>
-          <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
-          <p className="text-gray-400">Sign in to continue to your workspace</p>
+          <h1 className="text-3xl font-bold text-white mb-2">Welcome back</h1>
+          <p className="text-gray-500">Sign in to continue to your workspace</p>
         </div>
 
+        {/* Form Card */}
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
@@ -73,27 +81,38 @@ function LoginPage() {
                 placeholder="you@company.com"
                 className="input-field"
                 required
+                autoComplete="email"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="input-label">Password</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className="input-field"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  className="input-field pr-12"
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full flex items-center justify-center gap-2"
+              className="btn-primary w-full flex items-center justify-center gap-2 py-4"
             >
               {loading ? (
                 <>
@@ -101,19 +120,29 @@ function LoginPage() {
                   Signing in...
                 </>
               ) : (
-                'Sign In'
+                <>
+                  Sign In
+                  <ArrowRight className="w-4 h-4" />
+                </>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-400">
+          <div className="mt-8 text-center">
+            <p className="text-gray-500">
               Don't have an account?{' '}
-              <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-medium">
+              <Link to="/register" className="text-white hover:underline font-medium">
                 Create account
               </Link>
             </p>
           </div>
+        </div>
+
+        {/* Back to home */}
+        <div className="mt-8 text-center">
+          <Link to="/" className="text-gray-600 hover:text-gray-400 text-sm transition-colors">
+            ← Back to home
+          </Link>
         </div>
       </div>
     </div>

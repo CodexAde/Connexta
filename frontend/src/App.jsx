@@ -13,8 +13,8 @@ const ProtectedRoute = ({ children }) => {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
       </div>
     )
   }
@@ -31,8 +31,8 @@ const PublicRoute = ({ children }) => {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
       </div>
     )
   }
@@ -47,7 +47,13 @@ const PublicRoute = ({ children }) => {
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      {/* Entry point is now login */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      
+      {/* Landing page for marketing */}
+      <Route path="/home" element={<LandingPage />} />
+      <Route path="/welcome" element={<LandingPage />} />
+      
       <Route path="/login" element={
         <PublicRoute>
           <LoginPage />
@@ -69,7 +75,7 @@ function App() {
         <Route path="dm/:userId" element={<DMsPage />} />
         <Route path="calls" element={<CallRoomPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )
 }

@@ -2,9 +2,10 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useChannel } from '../context/ChannelContext'
 import Avatar from './Avatar'
+import { Home, MessageSquare, Phone, Hash, X, LogOut } from 'lucide-react'
 
-function Sidebar() {
-  const { user } = useAuth()
+function Sidebar({ onClose }) {
+  const { user, logout } = useAuth()
   const { channels, dmChannels } = useChannel()
   const navigate = useNavigate()
 
@@ -15,62 +16,85 @@ function Sidebar() {
     return channel.members?.find(m => m._id !== user?._id)
   }
 
+  const handleNavClick = () => {
+    if (onClose) onClose()
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
+
   return (
-    <div className="w-64 bg-bg-secondary border-r border-white/5 flex flex-col shrink-0">
-      <div className="p-4 border-b border-white/5">
+    <div className="w-64 md:w-64 bg-black border-r border-white/[0.05] flex flex-col shrink-0 h-full">
+      {/* Header */}
+      <div className="p-4 border-b border-white/[0.05] flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">C</span>
+          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center">
+            <span className="text-black font-bold text-lg">C</span>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white">Connexta</h1>
-            <p className="text-xs text-gray-500">Team Communication</p>
+            <h1 className="text-base font-bold text-white">Connexta</h1>
+            <p className="text-xs text-gray-600">Team Chat</p>
           </div>
         </div>
+        
+        {/* Close button for mobile */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-2 rounded-lg hover:bg-white/[0.05] transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        )}
       </div>
 
+      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3">
         <div className="mb-6">
           <NavLink
             to="/app"
             end
+            onClick={handleNavClick}
             className={({ isActive }) =>
               `sidebar-item ${isActive ? 'sidebar-item-active' : ''}`
             }
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
+            <Home className="w-5 h-5" />
             <span>Home</span>
           </NavLink>
 
           <NavLink
             to="/app/dm"
+            onClick={handleNavClick}
             className={({ isActive }) =>
               `sidebar-item ${isActive ? 'sidebar-item-active' : ''}`
             }
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
+            <MessageSquare className="w-5 h-5" />
             <span>Direct Messages</span>
           </NavLink>
 
           <NavLink
             to="/app/calls"
+            onClick={handleNavClick}
             className={({ isActive }) =>
               `sidebar-item ${isActive ? 'sidebar-item-active' : ''}`
             }
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-            </svg>
+            <Phone className="w-5 h-5" />
             <span>Calls</span>
           </NavLink>
         </div>
 
+        {/* Channels */}
         <div className="mb-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
+          <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider px-3 mb-2">
             Channels
           </h3>
           <div className="space-y-0.5">
@@ -78,11 +102,12 @@ function Sidebar() {
               <NavLink
                 key={channel._id}
                 to={`/app/channels/${channel.slug}`}
+                onClick={handleNavClick}
                 className={({ isActive }) =>
                   `channel-item ${isActive ? 'channel-item-active' : ''}`
                 }
               >
-                <span className="text-gray-500 text-lg">#</span>
+                <Hash className="w-4 h-4 text-gray-500" />
                 <span className="truncate">{channel.name?.replace('#', '')}</span>
               </NavLink>
             ))}
@@ -90,20 +115,22 @@ function Sidebar() {
               <NavLink
                 key={channel._id}
                 to={`/app/channels/${channel._id}`}
+                onClick={handleNavClick}
                 className={({ isActive }) =>
                   `channel-item ${isActive ? 'channel-item-active' : ''}`
                 }
               >
-                <span className="text-gray-500 text-lg">#</span>
+                <Hash className="w-4 h-4 text-gray-500" />
                 <span className="truncate">{channel.name?.replace('#', '')}</span>
               </NavLink>
             ))}
           </div>
         </div>
 
+        {/* Direct Messages */}
         {dmChannels.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
+            <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider px-3 mb-2">
               Direct Messages
             </h3>
             <div className="space-y-0.5">
@@ -115,6 +142,7 @@ function Sidebar() {
                   <NavLink
                     key={channel._id}
                     to={`/app/dm/${otherUser._id}`}
+                    onClick={handleNavClick}
                     className={({ isActive }) =>
                       `channel-item ${isActive ? 'channel-item-active' : ''}`
                     }
@@ -126,11 +154,13 @@ function Sidebar() {
               })}
               {dmChannels.length > 5 && (
                 <button
-                  onClick={() => navigate('/app/dm')}
+                  onClick={() => {
+                    navigate('/app/dm')
+                    handleNavClick()
+                  }}
                   className="channel-item w-full text-left"
                 >
-                  <span className="text-gray-500">+</span>
-                  <span>{dmChannels.length - 5} more</span>
+                  <span className="text-gray-500 text-sm">+{dmChannels.length - 5} more</span>
                 </button>
               )}
             </div>
@@ -138,14 +168,21 @@ function Sidebar() {
         )}
       </nav>
 
-      <div className="p-3 border-t border-white/5">
+      {/* User footer */}
+      <div className="p-3 border-t border-white/[0.05]">
         <div className="flex items-center gap-3 px-3 py-2">
           <Avatar user={user} size="sm" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.department}</p>
+            <p className="text-xs text-gray-600 truncate">{user?.department}</p>
           </div>
-          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-lg hover:bg-white/[0.05] text-gray-500 hover:text-white transition-colors"
+            title="Logout"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>

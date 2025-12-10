@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '../context/UserContext'
+import { useAuth } from '../context/AuthContext'
 import Avatar from './Avatar'
+import { Search } from 'lucide-react'
 
 function UserSearch({ onUserSelect }) {
   const [query, setQuery] = useState('')
@@ -8,6 +10,7 @@ function UserSearch({ onUserSelect }) {
   const [loading, setLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const { searchUsers } = useUser()
+  const { user: currentUser } = useAuth()
   const wrapperRef = useRef(null)
   const debounceRef = useRef(null)
 
@@ -35,7 +38,9 @@ function UserSearch({ onUserSelect }) {
     setLoading(true)
     debounceRef.current = setTimeout(async () => {
       const users = await searchUsers(query)
-      setResults(users)
+      // Filter out current user from results (safety fallback)
+      const filteredUsers = users.filter(u => u._id !== currentUser?._id)
+      setResults(filteredUsers)
       setLoading(false)
     }, 300)
 
@@ -44,7 +49,7 @@ function UserSearch({ onUserSelect }) {
         clearTimeout(debounceRef.current)
       }
     }
-  }, [query])
+  }, [query, currentUser?._id])
 
   const handleSelect = (user) => {
     onUserSelect(user)
@@ -56,19 +61,7 @@ function UserSearch({ onUserSelect }) {
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
-        <svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
         <input
           type="text"
           value={query}
@@ -79,7 +72,7 @@ function UserSearch({ onUserSelect }) {
         />
         {loading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
           </div>
         )}
       </div>
@@ -96,7 +89,7 @@ function UserSearch({ onUserSelect }) {
                 <button
                   key={user._id}
                   onClick={() => handleSelect(user)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.05] transition-colors text-left"
                 >
                   <Avatar user={user} size="sm" />
                   <div className="flex-1 min-w-0">

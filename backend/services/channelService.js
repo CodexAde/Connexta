@@ -27,9 +27,21 @@ export const getChannelsForUser = async (user) => {
   return accessibleChannels;
 };
 
+import mongoose from 'mongoose';
+
 export const getChannelById = async (channelId, user) => {
-  const channel = await Channel.findById(channelId)
-    .populate('members', 'name email department avatarUrl status');
+  let channel;
+  
+  if (mongoose.Types.ObjectId.isValid(channelId)) {
+    channel = await Channel.findById(channelId)
+      .populate('members', 'name email department avatarUrl status');
+  }
+  
+  if (!channel) {
+    // Try finding by slug
+    channel = await Channel.findOne({ slug: channelId })
+      .populate('members', 'name email department avatarUrl status');
+  }
   
   if (!channel) {
     throw new Error('Channel not found');

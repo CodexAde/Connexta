@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
   --color-primary: #ffffff;
@@ -80,8 +80,7 @@ body {
   background: var(--color-muted);
 }
 
-/* Mobile touch optimization */
-@media (max-width: 768px) {
+  /* Mobile touch optimization */
   * {
     -webkit-tap-highlight-color: transparent;
   }
@@ -93,22 +92,7 @@ body {
   body {
     -webkit-overflow-scrolling: touch;
   }
-  
-  /* Use dvh for mobile viewport */
-  /* Use standard vh with the new meta tag for proper keyboard resizing */
-  .h-screen {
-    height: 100vh !important; 
-  }
-  
-  /* Fallbacks/alternatives if needed */
-  .min-h-screen {
-    min-height: 100vh !important;
-  }
-  
-  .min-h-screen {
-    min-height: 100dvh !important;
-  }
-}
+
 
 /* Mobile keyboard handling - keeps input visible */
 @supports (height: 100dvh) {

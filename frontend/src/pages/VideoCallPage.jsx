@@ -196,13 +196,16 @@ function VideoCallPage() {
                   style={{ transform: 'scaleX(-1)' }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
+                <div className="w-full h-full flex items-center justify-center relative">
                   <div 
                     className="w-32 h-32 md:w-40 md:h-40 rounded-full flex items-center justify-center text-5xl md:text-6xl font-semibold text-white"
                     style={{ backgroundColor: getAvatarColor(user?.name) }}
                   >
                     {user?.name?.charAt(0)}
                   </div>
+                  <p className="absolute bottom-32 text-white/50 text-sm font-medium bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">
+                    Video Closed
+                  </p>
                 </div>
               )}
               
@@ -274,13 +277,16 @@ function VideoCallPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-full h-full flex items-center justify-center relative">
                       <div 
                         className="w-20 h-20 md:w-28 md:h-28 rounded-full flex items-center justify-center text-3xl md:text-4xl font-semibold text-white"
                         style={{ backgroundColor: getAvatarColor(participant.name) }}
                       >
                         {participant.name?.charAt(0)}
                       </div>
+                      <p className="absolute bottom-24 md:bottom-32 text-white/50 text-xs md:text-sm font-medium bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">
+                        Video Closed
+                      </p>
                     </div>
                   )}
                   <div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/70 text-sm text-white backdrop-blur-sm">

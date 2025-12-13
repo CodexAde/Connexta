@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { useAuth } from './AuthContext'
 import * as callService from '../services/callService'
@@ -314,214 +314,222 @@ export const CallProvider = ({ children }) => {
     return pc
   }
 
-  const startCall = async (type, channelId, recipientId, withVideo = false) => {
-    try {
-      // Request media
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: true, 
-        video: withVideo 
+  const startCall = useCallback(async (type, channelId, recipientId, withVideo = false) => {
+  console.log('📞 startCall triggered')
+  console.log('➡️ Params:', { type, channelId, recipientId, withVideo })
+
+  try {
+    console.log('🎥 Requesting media permissions...')
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: withVideo
+    })
+
+    console.log('✅ Media stream received:', stream)
+    console.log('🎧 Audio tracks:', stream.getAudioTracks())
+    console.log('📹 Video tracks:', stream.getVideoTracks())
+
+    setLocalStream(stream)
+    console.log('🧠 localStream state set')
+
+    localStreamRef.current = stream
+    console.log('📦 localStreamRef updated')
+
+    setIsVideoEnabled(withVideo)
+    console.log('🎬 Video enabled:', withVideo)
+
+    console.log('📡 Creating call on backend...')
+    const data = await callService.createCall({ type, channelId, recipientId })
+
+    console.log('✅ Call created:', data.call)
+
+    setCurrentCall(data.call)
+    currentCallRef.current = data.call
+
+    console.log('📞 Current call stored in state & ref')
+
+    setParticipants([
+      { ...user, isMuted: false, isVideoEnabled: withVideo }
+    ])
+
+    console.log('👥 Initial participant added:', user)
+
+    setInCall(true)
+    console.log('🚦 inCall set to TRUE')
+
+    if (socket) {
+      console.log('🔌 Socket available, joining room...')
+      socket.emit('call:join', {
+        roomId: channelId || recipientId,
+        roomType: type
       })
-      setLocalStream(stream)
-      localStreamRef.current = stream
-      setIsVideoEnabled(withVideo)
-
-      const data = await callService.createCall({ type, channelId, recipientId })
-      setCurrentCall(data.call)
-      currentCallRef.current = data.call
-      setParticipants([{ ...user, isMuted: false, isVideoEnabled: withVideo }])
-      setInCall(true)
-
-      if (socket) {
-        socket.emit('call:join', {
-          roomId: channelId || recipientId,
-          roomType: type
-        })
-      }
-
-      return data.call
-    } catch (error) {
-      console.error('Failed to start call:', error)
-      // Try audio-only if video fails
-      if (withVideo) {
-        try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-          setLocalStream(audioStream)
-          localStreamRef.current = audioStream
-          setIsVideoEnabled(false)
-          
-          const data = await callService.createCall({ type, channelId, recipientId })
-          setCurrentCall(data.call)
-          currentCallRef.current = data.call
-          setParticipants([{ ...user, isMuted: false, isVideoEnabled: false }])
-          setInCall(true)
-
-          if (socket) {
-            socket.emit('call:join', {
-              roomId: channelId || recipientId,
-              roomType: type
-            })
-          }
-
-          return data.call
-        } catch (audioError) {
-          console.error('Failed to start audio call:', audioError)
-          throw audioError
-        }
-      }
-      throw error
+      console.log('📨 call:join event emitted')
+    } else {
+      console.log('⚠️ Socket not available')
     }
-  }
 
-  const joinCall = async (call, withVideo = false) => {
+    console.log('🎉 Call started successfully')
+    return data.call
+
+  } catch (error) {
+    console.error('❌ Failed to start call:', error)
+
+    if (withVideo) {
+      console.log('🔁 Video failed, trying audio-only call...')
+
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false
+        })
+
+        console.log('🎧 Audio-only stream received:', audioStream)
+
+        setLocalStream(audioStream)
+        localStreamRef.current = audioStream
+        setIsVideoEnabled(false)
+
+        console.log('🔇 Switched to audio-only mode')
+
+        const data = await callService.createCall({ type, channelId, recipientId })
+
+        console.log('✅ Audio call created:', data.call)
+
+        setCurrentCall(data.call)
+        currentCallRef.current = data.call
+
+        setParticipants([
+          { ...user, isMuted: false, isVideoEnabled: false }
+        ])
+
+        setInCall(true)
+        console.log('📞 Audio call active')
+
+        if (socket) {
+          socket.emit('call:join', {
+            roomId: channelId || recipientId,
+            roomType: type
+          })
+          console.log('📨 call:join emitted (audio)')
+        }
+
+        return data.call
+
+      } catch (audioError) {
+        console.error('❌ Failed to start audio call:', audioError)
+        throw audioError
+      }
+    }
+
+    throw error
+  }
+}, [socket, user])
+
+  const joinCall = useCallback(async (call, withVideo = true) => { // Default to video true per request
+    console.log('📞 joinCall triggered')
+    console.log('➡️ Params:', { callId: call._id, withVideo })
+
     try {
+      console.log('🎥 Requesting media permissions...')
       // Respect withVideo preference
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: true, 
         video: withVideo 
       })
       
+      console.log('✅ Media stream received:', stream)
+      console.log('🎧 Audio tracks:', stream.getAudioTracks())
+      console.log('📹 Video tracks:', stream.getVideoTracks())
+
       setLocalStream(stream)
+      console.log('🧠 localStream state set')
+
       localStreamRef.current = stream
+      console.log('📦 localStreamRef updated')
+
       // Check if we actually got video
       const hasVideo = stream.getVideoTracks().length > 0
       setIsVideoEnabled(hasVideo)
+      console.log('🎬 Video enabled:', hasVideo)
 
       await callService.joinCall(call._id)
+      console.log('✅ Joined call on backend')
+
       setCurrentCall(call)
       currentCallRef.current = call
-      setParticipants(call.participants?.map(p => ({ ...p, isMuted: false })) || [])
+      console.log('📞 Current call stored')
+
+      // Ensure we set ourselves in participants correctly
+      setParticipants(prev => {
+        // We might already be in list via socket, but ensure local state is correct
+        const others = call.participants?.filter(p => p._id !== user?._id) || []
+        return [
+          ...others,
+          { ...user, isMuted: false, isVideoEnabled: hasVideo }
+        ]
+      })
+      console.log('👥 Participants updated')
+
       setInCall(true)
+      console.log('🚦 inCall set to TRUE')
+
       setIncomingCall(null)
 
       if (socket) {
+        console.log('🔌 Emitting call:join...')
         socket.emit('call:join', {
           roomId: call.channel || call.dmRoomId,
           roomType: call.type
         })
       }
     } catch (error) {
-      console.error('Failed to join call:', error)
-      throw error
-    }
-  }
-
-  const leaveCall = async () => {
-    if (currentCall) {
-      try {
-        await callService.leaveCall(currentCall._id)
-        if (socket) {
-          socket.emit('call:leave', {
-            roomId: currentCall.channel || currentCall.dmRoomId,
-            roomType: currentCall.type
-          })
-        }
-      } catch (error) {
-        console.error('Failed to leave call:', error)
-      }
-    }
-    cleanup()
-  }
-
-  const toggleMute = () => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0]
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled
-        setIsMuted(!audioTrack.enabled)
-        
-        if (socket && currentCall) {
-          socket.emit('call:toggle-mute', {
-            roomId: currentCall.channel || currentCall.dmRoomId,
-            roomType: currentCall.type,
-            isMuted: !audioTrack.enabled
-          })
-        }
-      }
-    }
-  }
-
-  const toggleVideo = async () => {
-    if (localStream) {
-      const videoTracks = localStream.getVideoTracks()
-      let newEnabledState = false
-      let newTrack = null
-
-      if (videoTracks.length > 0) {
-        const track = videoTracks[0]
-        if (track.readyState === 'ended') {
-          // Restart video
-          try {
-            const videoStream = await navigator.mediaDevices.getUserMedia({ video: true })
-            newTrack = videoStream.getVideoTracks()[0]
-            localStream.removeTrack(track)
-            localStream.addTrack(newTrack)
-            newEnabledState = true
-          } catch (error) {
-            console.error('Failed to restart video:', error)
-            return
-          }
-        } else {
-            // Normal toggle - but if we want to "stop" sending effectively, we stop the track?
-            // Or just enabled = false?
-            // If we want to replaceTrack(null), then we shouldn't just toggle .enabled
-            // But toggling .enabled is faster and simpler for "Mute Video" logic.
-            // Requirement: "simple call" vs "video call". 
-            // If we use replaceTrack(null), the remote sees black/frozen.
-            // Let's stick with enabled=false for soft mute.
-            // BUT if user wants strict "Audio Call", maybe we should stop it?
-            
-            // For stability with transceivers, let's try just toggling enabled first.
-            // IF the user reported error "order of m-lines", it implies we were adding/removing tracks.
-            // My previous code DID remove/add tracks in some cases.
-            // With transceivers, we should REPLACE track.
-            
-            track.enabled = !track.enabled
-            newEnabledState = track.enabled
-            // No need to replace track if we just toggled enabled.
-        }
-      } else {
-         // Upgrade audio only -> video
+      console.error('❌ Failed to join call:', error)
+      
+      if (withVideo) {
+         console.log('🔁 Video join failed, trying audio-only...')
          try {
-           const videoStream = await navigator.mediaDevices.getUserMedia({ video: true })
-           newTrack = videoStream.getVideoTracks()[0]
-           localStream.addTrack(newTrack)
-           newEnabledState = true
-         } catch (error) {
-           console.error('Failed to enable video:', error)
-           return
+            const audioStream = await navigator.mediaDevices.getUserMedia({ 
+              audio: true, 
+              video: false 
+            })
+            console.log('🎧 Audio-only stream received:', audioStream)
+            
+            setLocalStream(audioStream)
+            localStreamRef.current = audioStream
+            setIsVideoEnabled(false)
+            console.log('🔇 Switched to audio-only mode')
+
+            await callService.joinCall(call._id)
+            setCurrentCall(call)
+            currentCallRef.current = call
+            
+            setParticipants(prev => {
+                const others = call.participants?.filter(p => p._id !== user?._id) || []
+                return [
+                  ...others,
+                  { ...user, isMuted: false, isVideoEnabled: false }
+                ]
+            })
+
+            setInCall(true)
+            setIncomingCall(null)
+
+            if (socket) {
+                socket.emit('call:join', {
+                  roomId: call.channel || call.dmRoomId,
+                  roomType: call.type
+                })
+            }
+            return
+         } catch (audioError) {
+             console.error('❌ Audio fallback failed:', audioError)
+             throw audioError
          }
       }
-
-      // If we have a NEW track (upgrade or restart), replace it safely
-      if (newTrack) {
-        Object.values(peerConnections.current).forEach(pc => {
-             const videoTransceiver = pc.getTransceivers().find(t => t.receiver.track.kind === 'video')
-             if (videoTransceiver) {
-                 videoTransceiver.sender.replaceTrack(newTrack)
-             }
-        })
-      }
-
-      setIsVideoEnabled(newEnabledState)
-
-      if (socket && currentCall) {
-        socket.emit('call:toggle-video', {
-          roomId: currentCall.channel || currentCall.dmRoomId,
-          roomType: currentCall.type,
-          isVideoEnabled: newEnabledState,
-          userId: user._id
-        })
-      }
+      throw error
     }
-  }
-
-  const declineCall = () => {
-    setIncomingCall(null)
-  }
-
-  const getOngoingCall = (roomId) => {
-    return ongoingCalls[roomId] || null
-  }
+  }, [socket, user])
 
   const cleanup = useCallback(() => {
     if (localStreamRef.current) {
@@ -542,7 +550,149 @@ export const CallProvider = ({ children }) => {
     setIsVideoEnabled(false)
   }, [])
 
-  const value = {
+  const leaveCall = useCallback(async () => {
+    if (currentCall) {
+      try {
+        await callService.leaveCall(currentCall._id)
+        if (socket) {
+          socket.emit('call:leave', {
+            roomId: currentCall.channel || currentCall.dmRoomId,
+            roomType: currentCall.type
+          })
+        }
+      } catch (error) {
+        console.error('Failed to leave call:', error)
+      }
+    }
+    cleanup()
+  }, [currentCall, socket, cleanup])
+
+  const endCall = useCallback(async () => {
+    if (currentCall) {
+      const roomKey = currentCall.channel || currentCall.dmRoomId
+      
+      // Optimistically remove from ongoingCalls
+      if (roomKey) {
+        setOngoingCalls(prev => {
+          const updated = { ...prev }
+          delete updated[roomKey]
+          return updated
+        })
+      }
+
+      try {
+        await callService.endCall(currentCall._id)
+      } catch (error) {
+        console.error('Failed to end call:', error)
+      }
+    }
+    cleanup()
+  }, [currentCall, cleanup])
+
+  const toggleMute = useCallback(() => {
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0]
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled
+        setIsMuted(!audioTrack.enabled)
+        
+        if (socket && currentCall) {
+          socket.emit('call:toggle-mute', {
+            roomId: currentCall.channel || currentCall.dmRoomId,
+            roomType: currentCall.type,
+            isMuted: !audioTrack.enabled
+          })
+        }
+      }
+    }
+  }, [localStream, socket, currentCall])
+
+const toggleVideo = useCallback(() => {
+  console.log('🎬 toggleVideo CALLED')
+
+  const stream = localStreamRef.current
+  console.log('📦 localStreamRef:', stream)
+
+  if (!stream) {
+    console.error('❌ No localStream found')
+    return
+  }
+
+  const videoTracks = stream.getVideoTracks()
+  console.log('📹 Video Tracks:', videoTracks)
+
+  if (videoTracks.length === 0) {
+    console.error('❌ No video track in localStream')
+    return
+  }
+
+  const videoTrack = videoTracks[0]
+  console.log('🎥 Current videoTrack:', videoTrack)
+  console.log('➡️ enabled:', videoTrack.enabled)
+  console.log('➡️ readyState:', videoTrack.readyState)
+
+  // TOGGLE
+  videoTrack.enabled = !videoTrack.enabled
+  console.log('🔁 Toggled videoTrack.enabled →', videoTrack.enabled)
+
+  setIsVideoEnabled(videoTrack.enabled)
+  console.log('🧠 isVideoEnabled state updated')
+
+  // 🔌 PEER CONNECTION CHECK
+  const pcs = peerConnections.current
+  console.log('🔗 peerConnections:', pcs)
+
+  if (!pcs || Object.keys(pcs).length === 0) {
+    console.warn('⚠️ No peerConnections found')
+  } else {
+    Object.entries(pcs).forEach(([id, pc]) => {
+      console.log(`🧩 PC [${id}]`, pc)
+
+      const senders = pc.getSenders()
+      console.log('📤 Senders:', senders)
+
+      const videoSender = senders.find(s => s.track?.kind === 'video')
+      console.log('🎯 videoSender:', videoSender)
+
+      if (!videoSender) {
+        console.error('❌ No video sender found in PC')
+      } else {
+        console.log(
+          '📡 Sender track enabled:',
+          videoSender.track?.enabled
+        )
+      }
+    })
+  }
+
+  // 📡 SOCKET EVENT
+  if (socket && currentCall) {
+    const payload = {
+      roomId: currentCall.channel || currentCall.dmRoomId,
+      roomType: currentCall.type,
+      isVideoEnabled: videoTrack.enabled,
+      userId: user._id
+    }
+
+    console.log('📨 Emitting call:toggle-video', payload)
+    socket.emit('call:toggle-video', payload)
+  } else {
+    console.warn('⚠️ Socket or currentCall missing')
+  }
+
+  console.log('✅ toggleVideo END')
+}, [socket, currentCall, user])
+
+
+  const declineCall = useCallback(() => {
+    setIncomingCall(null)
+  }, [])
+
+  const getOngoingCall = useCallback((roomId) => {
+    return ongoingCalls[roomId] || null
+  }, [ongoingCalls])
+
+  const value = useMemo(() => ({
     currentCall,
     participants,
     localStream,
@@ -558,8 +708,26 @@ export const CallProvider = ({ children }) => {
     toggleMute,
     toggleVideo,
     declineCall,
-    getOngoingCall
-  }
+    getOngoingCall,
+    endCall
+  }), [
+    currentCall,
+    participants,
+    localStream,
+    isMuted,
+    isVideoEnabled,
+    inCall,
+    incomingCall,
+    ongoingCalls,
+    startCall,
+    joinCall,
+    leaveCall,
+    toggleMute,
+    toggleVideo,
+    declineCall,
+    getOngoingCall,
+    endCall
+  ])
 
   return (
     <CallContext.Provider value={value}>

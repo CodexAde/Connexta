@@ -21,6 +21,7 @@ function VideoCallPage() {
     toggleMute, 
     toggleVideo, 
     leaveCall,
+    endCall,
     inCall
   } = useCall()
 
@@ -48,7 +49,7 @@ function VideoCallPage() {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream
     }
-  }, [localStream])
+  }, [localStream, isVideoEnabled])
 
   // Attach remote streams to video elements
   useEffect(() => {
@@ -70,7 +71,11 @@ function VideoCallPage() {
   }, [inCall, currentCall, navigate])
 
   const handleLeaveCall = async () => {
-    await leaveCall()
+    if (participants.length <= 1) {
+      await endCall()
+    } else {
+      await leaveCall()
+    }
     navigate('/app')
   }
 

@@ -240,7 +240,7 @@ function ChannelPage() {
   const handleJoinOngoingCall = async () => {
     const ongoingCall = ongoingCalls[channel?._id]
     if (ongoingCall) {
-       await joinCall(ongoingCall)
+       await joinCall(ongoingCall, true) // Default to video on
        navigate('/call')
     }
   }
